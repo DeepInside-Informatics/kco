@@ -1,0 +1,14 @@
+apiVersion: kca.dev/v1
+kind: TargetWorkload
+metadata:
+  name: example-target
+  labels:
+    app: kca
+target:
+  labels:
+  - key: keyName1
+    value: keyValue1
+  - key: keyName2
+    value: keyValue2
+  - key: keyName3
+    value: keyValue3

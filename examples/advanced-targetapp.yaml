@@ -1,0 +1,133 @@
+apiVersion: operator.kco.local/v1alpha1
+kind: TargetApp
+metadata:
+  name: microservice-cluster
+  namespace: production
+spec:
+  # Monitor microservice pods
+  selector:
+    matchLabels:
+      app: microservice
+      tier: backend
+  
+  # Fast polling for critical service
+  graphqlEndpoint: "/api/graphql"
+  pollingInterval: 15
+  timeout: 5
+  maxRetries: 2
+  
+  # Comprehensive state query
+  stateQuery: |
+    query MicroserviceHealth {
+      service {
+        status
+        health
+        version
+        lastRestart
+        dependencies {
+          database {
+            connected
+            latency
+          }
+          cache {
+            connected
+            hitRate
+          }
+          messageQueue {
+            connected
+            backlog
+          }
+        }
+        metrics {
+          cpu
+          memory
+          requestRate
+          errorRate
+          p99Latency
+        }
+        errors {
+          count
+          recent
+        }
+      }
+    }
+  
+  actions:
+    # Critical: Database connection lost
+    - trigger:
+        field: "service.dependencies.database.connected"
+        condition: "equals"
+        value: false
+      action: "exec_command"
+      parameters:
+        command: ["/scripts/check-db-connection.sh"]
+        timeout: 30
+        container: "app"
+    
+    # High memory usage - restart gracefully
+    - trigger:
+        field: "service.metrics.memory"
+        condition: "greater_than"
+        value: 0.85
+      action: "restart_pod"
+      parameters:
+        gracePeriod: 60
+    
+    # High error rate - scale out
+    - trigger:
+        field: "service.metrics.errorRate"
+        condition: "greater_than"
+        value: 0.03
+      action: "scale_deployment"
+      parameters:
+        deploymentName: "microservice"
+        replicas: 8
+    
+    # Database latency issues - patch config
+    - trigger:
+        field: "service.dependencies.database.latency"
+        condition: "greater_than"
+        value: 1000
+      action: "patch_resource"
+      parameters:
+        resourceType: "configmap"
+        resourceName: "microservice-config"
+        patchData:
+          data:
+            DB_TIMEOUT: "30s"
+            DB_MAX_CONNECTIONS: "50"
+    
+    # Send detailed webhook on health changes
+    - trigger:
+        field: "service.health"
+        condition: "not_equals"
+        value: "healthy"
+      action: "webhook"
+      parameters:
+        url: "https://monitoring.company.com/webhooks/kco"
+        method: "POST"
+        timeout: 15
+        verifySSL: true
+        headers:
+          Authorization: "Bearer YOUR_API_TOKEN"
+          X-Source: "kco-operator"
+        payload:
+          service: "{{tapp_name}}"
+          namespace: "{{namespace}}"
+          timestamp: "{{timestamp}}"
+          severity: "warning"
+          details:
+            health: "unhealthy"
+            dependencies: null
+            metrics: null
+    
+    # Emergency: Execute maintenance script on critical errors
+    - trigger:
+        field: "service.errors.count"
+        condition: "greater_than"
+        value: 100
+      action: "exec_command"
+      parameters:
+        command: "python /scripts/emergency-cleanup.py --service={{tapp_name}}"
+        timeout: 300
+        workingDir: "/app"

@@ -1,0 +1,101 @@
+apiVersion: operator.kco.local/v1alpha1
+kind: TargetApp
+metadata:
+  name: webhook-example
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: sample-service
+  
+  graphqlEndpoint: "/graphql"
+  pollingInterval: 60
+  
+  stateQuery: |
+    query ServiceHealth {
+      application {
+        status
+        health
+        alerts {
+          critical
+          warnings
+        }
+        performance {
+          responseTime
+          throughput
+        }
+      }
+    }
+  
+  actions:
+    # Slack notification for critical alerts
+    - trigger:
+        field: "application.alerts.critical"
+        condition: "greater_than"
+        value: 0
+      action: "webhook"
+      parameters:
+        url: "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
+        method: "POST"
+        payload:
+          text: "🚨 Critical alert in {{tapp_name}}"
+          blocks:
+            - type: "section"
+              text:
+                type: "mrkdwn"
+                text: "*Critical Alert*\n Service: `{{tapp_name}}`\n Namespace: `{{namespace}}`\n Time: {{timestamp}}"
+            - type: "actions"
+              elements:
+                - type: "button"
+                  text:
+                    type: "plain_text"
+                    text: "View Dashboard"
+                  url: "https://grafana.company.com/d/service/{{tapp_name}}"
+    
+    # PagerDuty integration for service down
+    - trigger:
+        field: "application.status"
+        condition: "equals"
+        value: "down"
+      action: "webhook"
+      parameters:
+        url: "https://events.pagerduty.com/v2/enqueue"
+        method: "POST"
+        headers:
+          Content-Type: "application/json"
+        payload:
+          routing_key: "YOUR_PAGERDUTY_INTEGRATION_KEY"
+          event_action: "trigger"
+          payload:
+            summary: "Service {{tapp_name}} is down"
+            source: "kco-operator"
+            severity: "critical"
+            class: "service-outage"
+            component: "{{tapp_name}}"
+            group: "{{namespace}}"
+            custom_details:
+              namespace: "{{namespace}}"
+              service: "{{tapp_name}}"
+              operator: "kco"
+    
+    # Custom monitoring system webhook
+    - trigger:
+        field: "application.performance.responseTime"
+        condition: "greater_than"
+        value: 5000
+      action: "webhook"
+      parameters:
+        url: "https://monitoring-api.company.com/alerts"
+        method: "POST"
+        timeout: 10
+        headers:
+          Authorization: "Bearer YOUR_MONITORING_API_TOKEN"
+          Content-Type: "application/json"
+        payload:
+          alert_type: "performance_degradation"
+          service: "{{tapp_name}}"
+          namespace: "{{namespace}}"
+          metric: "response_time"
+          value: null  # Will be filled from actual state
+          threshold: 5000
+          timestamp: "{{timestamp}}"

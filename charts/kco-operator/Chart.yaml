@@ -1,0 +1,24 @@
+apiVersion: v2
+name: kco-operator
+description: A Helm chart for the Kubernetes Control Operator (KCO)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+
+keywords:
+  - kubernetes
+  - operator
+  - graphql
+  - monitoring
+  - automation
+
+maintainers:
+  - name: KCO Team
+    email: dev@kco.local
+
+sources:
+  - https://github.com/kco/kco-operator
+
+annotations:
+  category: Monitoring
+  licenses: MIT

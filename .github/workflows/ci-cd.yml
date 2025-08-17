@@ -149,6 +149,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     permissions:
+      actions: read
       contents: read
       packages: read
       security-events: write

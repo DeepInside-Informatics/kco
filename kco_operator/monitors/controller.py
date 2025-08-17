@@ -448,7 +448,7 @@ class MonitoringController:
                 }
                 
                 # Parse configuration
-                config = TAppConfig.parse_obj(converted_spec)
+                config = TAppConfig.model_validate(converted_spec)
                 
                 # Create and start monitor
                 monitor = TAppMonitor(

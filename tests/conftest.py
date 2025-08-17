@@ -5,9 +5,9 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from typing import Any, Dict
 
-from operator.config import OperatorSettings
-from operator.monitors.state import StateManager
-from operator.utils.k8s import KubernetesClient
+from kco_operator.config import OperatorSettings
+from kco_operator.monitors.state import StateManager
+from kco_operator.utils.k8s import KubernetesClient
 
 
 @pytest.fixture(scope="session")

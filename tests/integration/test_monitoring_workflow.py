@@ -5,9 +5,9 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timezone
 
-from operator.config import TAppConfig
-from operator.monitors.controller import MonitoringController
-from operator.utils.k8s import KubernetesClient
+from kco_operator.config import TAppConfig
+from kco_operator.monitors.controller import MonitoringController
+from kco_operator.utils.k8s import KubernetesClient
 
 
 class MockGraphQLServer:
@@ -155,7 +155,7 @@ class TestMonitoringWorkflow:
             }
         })
         
-        with patch('operator.monitors.graphql.GraphQLMonitor') as MockGraphQLMonitor:
+        with patch('kco_operator.monitors.graphql.GraphQLMonitor') as MockGraphQLMonitor:
             MockGraphQLMonitor.return_value = mock_server
             
             # Start monitoring
@@ -266,7 +266,7 @@ class TestTAppConfig:
     
     def test_valid_config_parsing(self, sample_tapp_spec):
         """Test parsing valid TApp configuration."""
-        config = TAppConfig.parse_obj(sample_tapp_spec)
+        config = TAppConfig.model_validate(sample_tapp_spec)
         
         assert config.polling_interval == 1
         assert config.graphql_endpoint == "/graphql"
@@ -282,7 +282,7 @@ class TestTAppConfig:
             "stateQuery": "query { status }"
         }
         
-        config = TAppConfig.parse_obj(minimal_spec)
+        config = TAppConfig.model_validate(minimal_spec)
         
         assert config.polling_interval == 30  # default
         assert config.graphql_endpoint == "/graphql"  # default
@@ -293,14 +293,14 @@ class TestTAppConfig:
     def test_invalid_config_validation(self):
         """Test that invalid configurations are rejected."""
         with pytest.raises(Exception):  # Should raise validation error
-            TAppConfig.parse_obj({
+            TAppConfig.model_validate({
                 "selector": {"matchLabels": {"app": "test"}},
                 "stateQuery": "query { status }",
                 "pollingInterval": 3601  # Too high
             })
         
         with pytest.raises(Exception):  # Should raise validation error
-            TAppConfig.parse_obj({
+            TAppConfig.model_validate({
                 "selector": {"matchLabels": {"app": "test"}},
                 "stateQuery": "query { status }",
                 "timeout": 0  # Too low

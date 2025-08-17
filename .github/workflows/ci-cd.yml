@@ -45,7 +45,7 @@ jobs:
       run: poetry install --no-interaction
 
     - name: Run tests
-      run: poetry run pytest
+      run: poetry run pytest tests/unit/ --cov=kco_operator --cov-report=term-missing
 
     - name: Run linting
       run: |

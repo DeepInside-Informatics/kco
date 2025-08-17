@@ -3,7 +3,7 @@
 import pytest
 from datetime import datetime, timezone
 
-from operator.monitors.state import StateManager, StateSnapshot, StateChange
+from kco_operator.monitors.state import StateManager, StateSnapshot, StateChange
 
 
 class TestStateSnapshot:

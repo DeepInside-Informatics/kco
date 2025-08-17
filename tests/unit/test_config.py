@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from operator.config import OperatorSettings, TAppConfig, ActionConfig
+from kco_operator.config import OperatorSettings, TAppConfig, ActionConfig
 
 
 class TestActionConfig:

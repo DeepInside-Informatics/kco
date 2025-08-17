@@ -30,10 +30,51 @@ class WebhookAction(ActionHandler):
 
     async def can_handle(self, context: ActionContext) -> bool:
         """Check if this action can handle the given context."""
+        # Extract trigger details for debugging
+        field = context.trigger_config.get("field")
+        condition = context.trigger_config.get("condition")
+        expected_value = context.trigger_config.get("value")
+
+        # Get current value for debugging
+        current_value: Any = None
+        if field:
+            try:
+                value: Any = context.state_change.new_snapshot.data
+                for part in field.split("."):
+                    if isinstance(value, dict) and part in value:
+                        value = value[part]
+                    else:
+                        value = None
+                        break
+                current_value = value
+            except Exception:
+                current_value = None
+
+        logger.info(
+            "Webhook can_handle - trigger details",
+            trigger_field=field,
+            trigger_condition=condition,
+            trigger_expected_value=expected_value,
+            current_value=current_value,
+            is_initial=context.state_change.is_initial,
+            changed_fields=list(context.state_change.changed_fields),
+            tapp=context.state_change.tapp_name,
+        )
+
         # Check if trigger condition is met
-        return self._evaluate_trigger_condition(
+        result = self._evaluate_trigger_condition(
             context.state_change, context.trigger_config
         )
+
+        logger.info(
+            "Webhook can_handle evaluation result",
+            can_handle=result,
+            trigger_config=context.trigger_config,
+            state_data=context.state_change.new_snapshot.data,
+            tapp=context.state_change.tapp_name,
+        )
+
+        return result
 
     async def execute(self, context: ActionContext) -> ActionResult:
         """Execute webhook action."""

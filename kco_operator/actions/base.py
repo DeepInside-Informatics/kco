@@ -100,8 +100,16 @@ class ActionHandler(ABC):
             logger.warning("Invalid trigger configuration", trigger=trigger_config)
             return False
 
-        # Check if the field actually changed
+        # For initial state changes, always evaluate condition
+        # For subsequent changes, only evaluate if the monitored field actually changed
         if not state_change.is_initial and field not in state_change.changed_fields:
+            # Field didn't change, so don't trigger action
+            logger.debug(
+                "Skipping trigger evaluation - field not changed",
+                field=field,
+                condition=condition,
+                changed_fields=list(state_change.changed_fields),
+            )
             return False
 
         # Get current value from state
@@ -111,7 +119,15 @@ class ActionHandler(ABC):
 
         # Evaluate condition
         if condition == "equals":
-            return bool(current_value == expected_value)
+            result = bool(current_value == expected_value)
+            logger.info(
+                "Evaluating equals condition",
+                field=field,
+                current_value=current_value,
+                expected_value=expected_value,
+                result=result,
+            )
+            return result
         elif condition == "not_equals":
             return bool(current_value != expected_value)
         elif condition == "greater_than":

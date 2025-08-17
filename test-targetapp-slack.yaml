@@ -29,7 +29,7 @@ spec:
       value: "SYNCED"
     action: "webhook"
     parameters:
-      url: "https://hooks.slack.com/services/SOMEUUIDFORTHEBOT/OTHERSLACKCHANNEL/SOMEUNIQUEID"
+      url: "https://hooks.slack.com/services/UNIQUEIDS"
       method: "POST"
       payload:
         text: "🚨 KCO Operator Alert: TargetApp {{tapp_name}} in namespace {{namespace}} has syncStatus={{syncStatus}} at {{timestamp}}"

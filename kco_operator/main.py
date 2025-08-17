@@ -72,6 +72,8 @@ async def startup(**kwargs: Any) -> None:
 
     # Import built-in actions to register them
     try:
+        from .actions import builtin  # noqa: F401
+
         logger.info("Loaded built-in action handlers")
     except Exception as e:
         logger.warning("Failed to load some built-in actions", error=str(e))

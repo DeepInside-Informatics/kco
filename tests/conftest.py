@@ -1,13 +1,13 @@
 """Pytest configuration and fixtures for KCO Operator tests."""
 
 import asyncio
-import pytest
 from unittest.mock import AsyncMock, MagicMock
-from typing import Any, Dict
 
-from operator.config import OperatorSettings
-from operator.monitors.state import StateManager
-from operator.utils.k8s import KubernetesClient
+import pytest
+
+from kco_operator.config import OperatorSettings
+from kco_operator.monitors.state import StateManager
+from kco_operator.utils.k8s import KubernetesClient
 
 
 @pytest.fixture(scope="session")
@@ -27,7 +27,7 @@ def operator_settings():
         graphql_max_retries=2,
         default_polling_interval=10,
         metrics_enabled=False,
-        health_port=9999
+        health_port=9999,
     )
 
 
@@ -42,14 +42,14 @@ async def state_manager():
 def mock_k8s_client():
     """Provide a mocked Kubernetes client."""
     client = MagicMock(spec=KubernetesClient)
-    
+
     # Mock async methods
     client.get_pods_by_selector = AsyncMock(return_value=[])
     client.create_event = AsyncMock()
     client.scale_deployment = AsyncMock()
     client.restart_pod = AsyncMock()
     client.close = AsyncMock()
-    
+
     return client
 
 
@@ -57,11 +57,7 @@ def mock_k8s_client():
 def sample_tapp_config():
     """Provide sample TApp configuration."""
     return {
-        "selector": {
-            "matchLabels": {
-                "app": "test-app"
-            }
-        },
+        "selector": {"matchLabels": {"app": "test-app"}},
         "graphqlEndpoint": "/graphql",
         "pollingInterval": 30,
         "stateQuery": """
@@ -77,14 +73,12 @@ def sample_tapp_config():
                 "trigger": {
                     "field": "application.health",
                     "condition": "equals",
-                    "value": "unhealthy"
+                    "value": "unhealthy",
                 },
                 "action": "restart_pod",
-                "parameters": {
-                    "gracePeriod": 30
-                }
+                "parameters": {"gracePeriod": 30},
             }
-        ]
+        ],
     }
 
 
@@ -97,7 +91,7 @@ def sample_graphql_response():
                 "status": "running",
                 "health": "healthy",
                 "version": "1.0.0",
-                "uptime": 3600
+                "uptime": 3600,
             }
         }
     }
@@ -106,12 +100,10 @@ def sample_graphql_response():
 @pytest.fixture
 def sample_pod():
     """Provide sample Kubernetes pod object."""
-    from kubernetes_asyncio.client import V1Pod, V1ObjectMeta
-    
+    from kubernetes_asyncio.client import V1ObjectMeta, V1Pod
+
     return V1Pod(
         metadata=V1ObjectMeta(
-            name="test-pod",
-            namespace="default",
-            labels={"app": "test-app"}
+            name="test-pod", namespace="default", labels={"app": "test-app"}
         )
     )

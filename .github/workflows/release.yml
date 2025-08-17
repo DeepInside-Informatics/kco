@@ -1,0 +1,116 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install Podman
+      run: |
+        sudo apt-get update
+        sudo apt-get -y install podman
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract version from tag
+      id: version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "version_number=${VERSION#v}" >> $GITHUB_OUTPUT
+
+    - name: Build release image
+      run: |
+        ./build.sh "${{ steps.version.outputs.version }}"
+
+    - name: Tag and push release images
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        VERSION_NUMBER="${{ steps.version.outputs.version_number }}"
+        
+        # Full image name with registry
+        FULL_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+        
+        # Tag with version variants
+        podman tag "kco:$VERSION" "$FULL_IMAGE:$VERSION"
+        podman tag "kco:$VERSION" "$FULL_IMAGE:$VERSION_NUMBER"
+        podman tag "kco:$VERSION" "$FULL_IMAGE:latest"
+        
+        # Push all tags
+        podman push "$FULL_IMAGE:$VERSION"
+        podman push "$FULL_IMAGE:$VERSION_NUMBER"
+        podman push "$FULL_IMAGE:latest"
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Simple changelog generation - you might want to use a more sophisticated tool
+        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        
+        if [ -n "$PREVIOUS_TAG" ]; then
+          echo "## Changes since $PREVIOUS_TAG" > CHANGELOG.md
+          git log --pretty=format:"- %s (%h)" "$PREVIOUS_TAG"..HEAD >> CHANGELOG.md
+        else
+          echo "## Initial Release" > CHANGELOG.md
+          echo "First release of KCO Operator" >> CHANGELOG.md
+        fi
+        
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        cat CHANGELOG.md >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.version.outputs.version }}
+        name: Release ${{ steps.version.outputs.version }}
+        body: |
+          # KCO Operator ${{ steps.version.outputs.version }}
+          
+          ${{ steps.changelog.outputs.changelog }}
+          
+          ## Container Images
+          
+          ```bash
+          # Pull the latest release
+          podman pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+          
+          # Or use the latest tag
+          podman pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          ```
+          
+          ## Deployment
+          
+          ```bash
+          # Deploy with Helm
+          helm install kco-operator ./charts/kco-operator \
+            --namespace kco-system \
+            --create-namespace \
+            --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
+            --set image.tag=${{ steps.version.outputs.version }}
+          ```
+        draft: false
+        prerelease: ${{ contains(steps.version.outputs.version, 'alpha') || contains(steps.version.outputs.version, 'beta') || contains(steps.version.outputs.version, 'rc') }}
+        generate_release_notes: true

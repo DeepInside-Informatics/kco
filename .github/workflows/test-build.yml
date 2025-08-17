@@ -1,0 +1,86 @@
+name: Test Build
+
+# This workflow can be triggered manually for testing
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag to build'
+        required: false
+        default: 'test'
+      push_to_registry:
+        description: 'Push to registry'
+        type: boolean
+        required: false
+        default: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Podman
+      run: |
+        sudo apt-get update
+        sudo apt-get -y install podman
+
+    - name: Log in to Container Registry
+      if: ${{ inputs.push_to_registry }}
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build container image
+      run: |
+        TAG="${{ inputs.tag }}"
+        echo "Building with tag: $TAG"
+        ./build.sh "$TAG"
+
+    - name: Test image
+      run: |
+        TAG="${{ inputs.tag }}"
+        echo "Testing image: kco:$TAG"
+        
+        # Test that the operator module loads
+        podman run --rm "kco:$TAG" python -c "import kco_operator; print('✓ Module loads successfully')"
+        
+        # Test that the image has expected labels
+        podman inspect "kco:$TAG" --format '{{json .Config.Labels}}' | jq .
+
+    - name: Tag and push to registry
+      if: ${{ inputs.push_to_registry }}
+      run: |
+        TAG="${{ inputs.tag }}"
+        FULL_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$TAG"
+        
+        echo "Tagging: kco:$TAG -> $FULL_TAG"
+        podman tag "kco:$TAG" "$FULL_TAG"
+        
+        echo "Pushing: $FULL_TAG"
+        podman push "$FULL_TAG"
+
+    - name: Generate summary
+      run: |
+        echo "## Test Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Tag**: ${{ inputs.tag }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Push to Registry**: ${{ inputs.push_to_registry }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Image**: kco:${{ inputs.tag }}" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ inputs.push_to_registry }}" = "true" ]; then
+          echo "- **Registry Image**: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.tag }}" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Build completed successfully!" >> $GITHUB_STEP_SUMMARY

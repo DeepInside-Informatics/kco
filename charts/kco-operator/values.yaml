@@ -7,7 +7,7 @@ global:
 
 # Operator image configuration
 image:
-  repository: kco-operator
+  repository: ghcr.io/deepinside-informatics/kco
   pullPolicy: IfNotPresent
   tag: "latest"
 

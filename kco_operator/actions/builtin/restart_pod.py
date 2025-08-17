@@ -23,8 +23,7 @@ class RestartPodAction(ActionHandler):
         """Check if this action can handle the given context."""
         # Check if trigger condition is met
         return self._evaluate_trigger_condition(
-            context.state_change,
-            context.trigger_config
+            context.state_change, context.trigger_config
         )
 
     async def execute(self, context: ActionContext) -> ActionResult:
@@ -36,14 +35,16 @@ class RestartPodAction(ActionHandler):
 
             # If no specific pod selector, use the TApp selector
             if not pod_selector:
-                pod_selector = context.tapp_config.get("selector", {}).get("matchLabels", {})
+                pod_selector = context.tapp_config.get("selector", {}).get(
+                    "matchLabels", {}
+                )
 
             if not pod_selector:
                 return ActionResult(
                     status=ActionStatus.FAILED,
                     message="No pod selector specified",
                     details={},
-                    execution_time_seconds=0
+                    execution_time_seconds=0,
                 )
 
             # Convert selector to label selector string
@@ -51,8 +52,7 @@ class RestartPodAction(ActionHandler):
 
             # Find pods to restart
             pods = await self.k8s_client.get_pods_by_selector(
-                namespace=context.state_change.namespace,
-                label_selector=label_selector
+                namespace=context.state_change.namespace, label_selector=label_selector
             )
 
             if not pods:
@@ -60,7 +60,7 @@ class RestartPodAction(ActionHandler):
                     status=ActionStatus.SKIPPED,
                     message=f"No pods found with selector: {label_selector}",
                     details={"selector": label_selector},
-                    execution_time_seconds=0
+                    execution_time_seconds=0,
                 )
 
             # Restart each pod
@@ -70,7 +70,7 @@ class RestartPodAction(ActionHandler):
                     await self.k8s_client.restart_pod(
                         namespace=pod.metadata.namespace,
                         pod_name=pod.metadata.name,
-                        grace_period=grace_period
+                        grace_period=grace_period,
                     )
                     restarted_pods.append(pod.metadata.name)
 
@@ -78,7 +78,7 @@ class RestartPodAction(ActionHandler):
                         "Restarted pod",
                         pod=pod.metadata.name,
                         namespace=pod.metadata.namespace,
-                        tapp=context.state_change.tapp_name
+                        tapp=context.state_change.tapp_name,
                     )
 
                 except Exception as e:
@@ -86,7 +86,7 @@ class RestartPodAction(ActionHandler):
                         "Failed to restart pod",
                         pod=pod.metadata.name,
                         namespace=pod.metadata.namespace,
-                        error=str(e)
+                        error=str(e),
                     )
                     # Continue with other pods
 
@@ -97,28 +97,28 @@ class RestartPodAction(ActionHandler):
                     details={
                         "restarted_pods": restarted_pods,
                         "grace_period": grace_period,
-                        "selector": label_selector
+                        "selector": label_selector,
                     },
-                    execution_time_seconds=0  # Will be set by registry
+                    execution_time_seconds=0,  # Will be set by registry
                 )
             else:
                 return ActionResult(
                     status=ActionStatus.FAILED,
                     message="Failed to restart any pods",
                     details={"selector": label_selector},
-                    execution_time_seconds=0
+                    execution_time_seconds=0,
                 )
 
         except Exception as e:
             logger.error(
                 "Error in restart pod action",
                 error=str(e),
-                tapp=context.state_change.tapp_name
+                tapp=context.state_change.tapp_name,
             )
 
             return ActionResult(
                 status=ActionStatus.FAILED,
                 message=f"Failed to restart pods: {str(e)}",
                 details={"error": str(e)},
-                execution_time_seconds=0
+                execution_time_seconds=0,
             )

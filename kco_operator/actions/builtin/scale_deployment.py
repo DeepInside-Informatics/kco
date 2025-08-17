@@ -22,8 +22,7 @@ class ScaleDeploymentAction(ActionHandler):
         """Check if this action can handle the given context."""
         # Check if trigger condition is met
         return self._evaluate_trigger_condition(
-            context.state_change,
-            context.trigger_config
+            context.state_change, context.trigger_config
         )
 
     async def execute(self, context: ActionContext) -> ActionResult:
@@ -38,7 +37,7 @@ class ScaleDeploymentAction(ActionHandler):
                     status=ActionStatus.FAILED,
                     message="Missing required parameter: deploymentName",
                     details={},
-                    execution_time_seconds=0
+                    execution_time_seconds=0,
                 )
 
             if replica_count is None:
@@ -46,7 +45,7 @@ class ScaleDeploymentAction(ActionHandler):
                     status=ActionStatus.FAILED,
                     message="Missing required parameter: replicas",
                     details={},
-                    execution_time_seconds=0
+                    execution_time_seconds=0,
                 )
 
             try:
@@ -56,7 +55,7 @@ class ScaleDeploymentAction(ActionHandler):
                     status=ActionStatus.FAILED,
                     message=f"Invalid replica count: {replica_count}",
                     details={"provided_replicas": replica_count},
-                    execution_time_seconds=0
+                    execution_time_seconds=0,
                 )
 
             if replica_count < 0:
@@ -64,14 +63,14 @@ class ScaleDeploymentAction(ActionHandler):
                     status=ActionStatus.FAILED,
                     message=f"Replica count cannot be negative: {replica_count}",
                     details={"provided_replicas": replica_count},
-                    execution_time_seconds=0
+                    execution_time_seconds=0,
                 )
 
             # Scale the deployment
             await self.k8s_client.scale_deployment(
                 namespace=context.state_change.namespace,
                 deployment_name=deployment_name,
-                replicas=replica_count
+                replicas=replica_count,
             )
 
             logger.info(
@@ -79,7 +78,7 @@ class ScaleDeploymentAction(ActionHandler):
                 deployment=deployment_name,
                 namespace=context.state_change.namespace,
                 replicas=replica_count,
-                tapp=context.state_change.tapp_name
+                tapp=context.state_change.tapp_name,
             )
 
             return ActionResult(
@@ -88,21 +87,21 @@ class ScaleDeploymentAction(ActionHandler):
                 details={
                     "deployment_name": deployment_name,
                     "replicas": replica_count,
-                    "namespace": context.state_change.namespace
+                    "namespace": context.state_change.namespace,
                 },
-                execution_time_seconds=0  # Will be set by registry
+                execution_time_seconds=0,  # Will be set by registry
             )
 
         except Exception as e:
             logger.error(
                 "Error in scale deployment action",
                 error=str(e),
-                tapp=context.state_change.tapp_name
+                tapp=context.state_change.tapp_name,
             )
 
             return ActionResult(
                 status=ActionStatus.FAILED,
                 message=f"Failed to scale deployment: {str(e)}",
                 details={"error": str(e)},
-                execution_time_seconds=0
+                execution_time_seconds=0,
             )

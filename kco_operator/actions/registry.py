@@ -31,8 +31,7 @@ class ActionRegistry:
         async with self._lock:
             if handler.name in self._handlers:
                 logger.warning(
-                    "Overriding existing action handler",
-                    action=handler.name
+                    "Overriding existing action handler", action=handler.name
                 )
 
             self._handlers[handler.name] = handler
@@ -40,14 +39,11 @@ class ActionRegistry:
             logger.info(
                 "Registered action handler",
                 action=handler.name,
-                description=handler.description
+                description=handler.description,
             )
 
     async def execute_action(
-        self,
-        action_name: str,
-        context: ActionContext,
-        timeout_seconds: int = 300
+        self, action_name: str, context: ActionContext, timeout_seconds: int = 300
     ) -> ActionResult:
         """Execute an action with the specified context.
 
@@ -69,7 +65,7 @@ class ActionRegistry:
                 status=ActionStatus.FAILED,
                 message=f"Action handler '{action_name}' not found",
                 details={"available_actions": list(self._handlers.keys())},
-                execution_time_seconds=time.time() - start_time
+                execution_time_seconds=time.time() - start_time,
             )
 
         try:
@@ -79,20 +75,19 @@ class ActionRegistry:
                     status=ActionStatus.SKIPPED,
                     message=f"Action handler '{action_name}' cannot handle this context",
                     details={},
-                    execution_time_seconds=time.time() - start_time
+                    execution_time_seconds=time.time() - start_time,
                 )
 
             logger.info(
                 "Executing action",
                 action=action_name,
                 tapp=context.state_change.tapp_name,
-                namespace=context.state_change.namespace
+                namespace=context.state_change.namespace,
             )
 
             # Execute with timeout
             result = await asyncio.wait_for(
-                handler.execute(context),
-                timeout=timeout_seconds
+                handler.execute(context), timeout=timeout_seconds
             )
 
             result.execution_time_seconds = time.time() - start_time
@@ -102,7 +97,7 @@ class ActionRegistry:
                 action=action_name,
                 status=result.status.value,
                 execution_time=result.execution_time_seconds,
-                tapp=context.state_change.tapp_name
+                tapp=context.state_change.tapp_name,
             )
 
             return result
@@ -114,14 +109,14 @@ class ActionRegistry:
                 action=action_name,
                 timeout=timeout_seconds,
                 execution_time=execution_time,
-                tapp=context.state_change.tapp_name
+                tapp=context.state_change.tapp_name,
             )
 
             return ActionResult(
                 status=ActionStatus.TIMEOUT,
                 message=f"Action '{action_name}' timed out after {timeout_seconds}s",
                 details={"timeout_seconds": timeout_seconds},
-                execution_time_seconds=execution_time
+                execution_time_seconds=execution_time,
             )
 
         except Exception as e:
@@ -131,14 +126,14 @@ class ActionRegistry:
                 action=action_name,
                 error=str(e),
                 execution_time=execution_time,
-                tapp=context.state_change.tapp_name
+                tapp=context.state_change.tapp_name,
             )
 
             return ActionResult(
                 status=ActionStatus.FAILED,
                 message=f"Action '{action_name}' failed: {str(e)}",
                 details={"error": str(e), "error_type": type(e).__name__},
-                execution_time_seconds=execution_time
+                execution_time_seconds=execution_time,
             )
 
     async def list_actions(self) -> list[dict[str, str]]:
@@ -149,10 +144,7 @@ class ActionRegistry:
         """
         async with self._lock:
             return [
-                {
-                    "name": name,
-                    "description": handler.description
-                }
+                {"name": name, "description": handler.description}
                 for name, handler in self._handlers.items()
             ]
 
@@ -164,7 +156,7 @@ class ActionRegistry:
         """
         return {
             "registered_actions": len(self._handlers),
-            "action_names": list(self._handlers.keys())
+            "action_names": list(self._handlers.keys()),
         }
 
 
@@ -182,11 +174,14 @@ def register_action(action_name: str, description: str = "") -> Any:
     Returns:
         Decorator function
     """
+
     def decorator(cls: type[ActionHandler]) -> type[ActionHandler]:
         @wraps(cls)
         async def wrapper(*args: Any, **kwargs: Any) -> ActionHandler:
             # Create instance of the handler
-            instance = cls(action_name, description or f"Action handler for {action_name}")
+            instance = cls(
+                action_name, description or f"Action handler for {action_name}"
+            )
 
             # Register it with the global registry
             await _action_registry.register(instance)
@@ -195,7 +190,9 @@ def register_action(action_name: str, description: str = "") -> Any:
 
         # Create and register the instance immediately
         async def _register() -> None:
-            instance = cls(action_name, description or f"Action handler for {action_name}")
+            instance = cls(
+                action_name, description or f"Action handler for {action_name}"
+            )
             await _action_registry.register(instance)
 
         # Schedule registration for next event loop iteration

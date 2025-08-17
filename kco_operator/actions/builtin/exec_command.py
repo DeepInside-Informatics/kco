@@ -27,8 +27,7 @@ class ExecCommandAction(ActionHandler):
         """Check if this action can handle the given context."""
         # Check if trigger condition is met
         return self._evaluate_trigger_condition(
-            context.state_change,
-            context.trigger_config
+            context.state_change, context.trigger_config
         )
 
     async def execute(self, context: ActionContext) -> ActionResult:
@@ -46,7 +45,7 @@ class ExecCommandAction(ActionHandler):
                     status=ActionStatus.FAILED,
                     message="Missing required parameter: command",
                     details={},
-                    execution_time_seconds=0
+                    execution_time_seconds=0,
                 )
 
             # Parse command (support both string and array formats)
@@ -59,19 +58,21 @@ class ExecCommandAction(ActionHandler):
                     status=ActionStatus.FAILED,
                     message="Command must be string or array",
                     details={"provided_command": str(command)},
-                    execution_time_seconds=0
+                    execution_time_seconds=0,
                 )
 
             # If no specific pod selector, use the TApp selector
             if not pod_selector:
-                pod_selector = context.tapp_config.get("selector", {}).get("matchLabels", {})
+                pod_selector = context.tapp_config.get("selector", {}).get(
+                    "matchLabels", {}
+                )
 
             if not pod_selector:
                 return ActionResult(
                     status=ActionStatus.FAILED,
                     message="No pod selector specified",
                     details={},
-                    execution_time_seconds=0
+                    execution_time_seconds=0,
                 )
 
             # Convert selector to label selector string
@@ -79,8 +80,7 @@ class ExecCommandAction(ActionHandler):
 
             # Find pods to execute command in
             pods = await self.k8s_client.get_pods_by_selector(
-                namespace=context.state_change.namespace,
-                label_selector=label_selector
+                namespace=context.state_change.namespace, label_selector=label_selector
             )
 
             if not pods:
@@ -88,7 +88,7 @@ class ExecCommandAction(ActionHandler):
                     status=ActionStatus.SKIPPED,
                     message=f"No pods found with selector: {label_selector}",
                     details={"selector": label_selector},
-                    execution_time_seconds=0
+                    execution_time_seconds=0,
                 )
 
             # Execute command in each pod
@@ -100,7 +100,7 @@ class ExecCommandAction(ActionHandler):
                         command=cmd_args,
                         container=container,
                         timeout=timeout,
-                        working_dir=working_dir
+                        working_dir=working_dir,
                     )
                     results.append(result)
 
@@ -110,16 +110,18 @@ class ExecCommandAction(ActionHandler):
                         pod=pod.metadata.name,
                         namespace=pod.metadata.namespace,
                         command=cmd_args,
-                        error=str(e)
+                        error=str(e),
                     )
-                    results.append({
-                        "pod": pod.metadata.name,
-                        "success": False,
-                        "error": str(e),
-                        "stdout": "",
-                        "stderr": "",
-                        "exit_code": -1
-                    })
+                    results.append(
+                        {
+                            "pod": pod.metadata.name,
+                            "success": False,
+                            "error": str(e),
+                            "stdout": "",
+                            "stderr": "",
+                            "exit_code": -1,
+                        }
+                    )
 
             # Determine overall success
             successful_executions = [r for r in results if r["success"]]
@@ -139,23 +141,23 @@ class ExecCommandAction(ActionHandler):
                     "selector": label_selector,
                     "results": results,
                     "successful_pods": len(successful_executions),
-                    "total_pods": len(results)
+                    "total_pods": len(results),
                 },
-                execution_time_seconds=0  # Will be set by registry
+                execution_time_seconds=0,  # Will be set by registry
             )
 
         except Exception as e:
             logger.error(
                 "Error in exec command action",
                 error=str(e),
-                tapp=context.state_change.tapp_name
+                tapp=context.state_change.tapp_name,
             )
 
             return ActionResult(
                 status=ActionStatus.FAILED,
                 message=f"Failed to execute command: {str(e)}",
                 details={"error": str(e)},
-                execution_time_seconds=0
+                execution_time_seconds=0,
             )
 
     async def _exec_in_pod(
@@ -164,7 +166,7 @@ class ExecCommandAction(ActionHandler):
         command: list[str],
         container: str | None = None,
         timeout: int = 60,
-        working_dir: str | None = None
+        working_dir: str | None = None,
     ) -> dict[str, Any]:
         """Execute command in a specific pod."""
         pod_name = pod.metadata.name
@@ -184,7 +186,7 @@ class ExecCommandAction(ActionHandler):
                 "Multiple containers found, using first one",
                 pod=pod_name,
                 container=target_container,
-                available_containers=[c.name for c in pod.spec.containers]
+                available_containers=[c.name for c in pod.spec.containers],
             )
         else:
             raise ValueError(f"No containers found in pod {pod_name}")
@@ -194,7 +196,7 @@ class ExecCommandAction(ActionHandler):
             pod=pod_name,
             namespace=namespace,
             container=target_container,
-            command=command
+            command=command,
         )
 
         try:
@@ -211,14 +213,18 @@ class ExecCommandAction(ActionHandler):
                 "stderr": True,
                 "stdin": False,
                 "stdout": True,
-                "tty": False
+                "tty": False,
             }
 
             # Add working directory if specified
             if working_dir:
                 # Note: Kubernetes doesn't directly support changing working directory
                 # We need to wrap the command to change directory first
-                if isinstance(command, list) and len(command) >= 3 and command[0:2] == ["/bin/sh", "-c"]:
+                if (
+                    isinstance(command, list)
+                    and len(command) >= 3
+                    and command[0:2] == ["/bin/sh", "-c"]
+                ):
                     # Modify the shell command to include cd
                     original_cmd = command[2]
                     command[2] = f"cd {working_dir} && {original_cmd}"
@@ -231,8 +237,7 @@ class ExecCommandAction(ActionHandler):
 
             # Execute with timeout
             resp = await asyncio.wait_for(
-                core_v1.connect_get_namespaced_pod_exec(**exec_params),
-                timeout=timeout
+                core_v1.connect_get_namespaced_pod_exec(**exec_params), timeout=timeout
             )
 
             # Parse response
@@ -241,19 +246,20 @@ class ExecCommandAction(ActionHandler):
             exit_code = 0
 
             if resp:
-                lines = resp.split('\n')
+                lines = resp.split("\n")
                 for line in lines:
-                    if line.startswith('1'):  # stdout channel
-                        stdout += line[1:] + '\n'
-                    elif line.startswith('2'):  # stderr channel
-                        stderr += line[1:] + '\n'
-                    elif line.startswith('3'):  # error channel
+                    if line.startswith("1"):  # stdout channel
+                        stdout += line[1:] + "\n"
+                    elif line.startswith("2"):  # stderr channel
+                        stderr += line[1:] + "\n"
+                    elif line.startswith("3"):  # error channel
                         # Extract exit code if possible
                         try:
                             import json
+
                             error_data = json.loads(line[1:])
-                            if 'status' in error_data:
-                                if error_data['status'] == 'Success':
+                            if "status" in error_data:
+                                if error_data["status"] == "Success":
                                     exit_code = 0
                                 else:
                                     exit_code = 1
@@ -267,7 +273,7 @@ class ExecCommandAction(ActionHandler):
                 pod=pod_name,
                 container=target_container,
                 success=success,
-                exit_code=exit_code
+                exit_code=exit_code,
             )
 
             return {
@@ -277,7 +283,7 @@ class ExecCommandAction(ActionHandler):
                 "exit_code": exit_code,
                 "stdout": stdout.strip(),
                 "stderr": stderr.strip(),
-                "command": command
+                "command": command,
             }
 
         except asyncio.TimeoutError:
@@ -285,7 +291,7 @@ class ExecCommandAction(ActionHandler):
                 "Command execution timed out",
                 pod=pod_name,
                 container=target_container,
-                timeout=timeout
+                timeout=timeout,
             )
 
             return {
@@ -295,7 +301,7 @@ class ExecCommandAction(ActionHandler):
                 "exit_code": -1,
                 "stdout": "",
                 "stderr": f"Command timed out after {timeout} seconds",
-                "error": "timeout"
+                "error": "timeout",
             }
 
         except Exception as e:
@@ -303,7 +309,7 @@ class ExecCommandAction(ActionHandler):
                 "Error executing command in pod",
                 pod=pod_name,
                 container=target_container,
-                error=str(e)
+                error=str(e),
             )
 
             return {
@@ -313,9 +319,9 @@ class ExecCommandAction(ActionHandler):
                 "exit_code": -1,
                 "stdout": "",
                 "stderr": "",
-                "error": str(e)
+                "error": str(e),
             }
 
         finally:
-            if 'ws_client' in locals():
+            if "ws_client" in locals():
                 await ws_client.close()

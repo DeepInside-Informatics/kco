@@ -37,7 +37,7 @@ class GraphQLMonitor:
         self.max_retries = max_retries
 
         # Handle direct URLs (when endpoint is a full URL)
-        if endpoint.startswith(('http://', 'https://')):
+        if endpoint.startswith(("http://", "https://")):
             self.url = endpoint
         else:
             self.url = urljoin(f"{self.base_url}/", endpoint.lstrip("/"))
@@ -51,7 +51,7 @@ class GraphQLMonitor:
             "Initialized GraphQL monitor",
             url=self.url,
             timeout=timeout,
-            max_retries=max_retries
+            max_retries=max_retries,
         )
 
     async def _ensure_client(self) -> Client:
@@ -59,18 +59,17 @@ class GraphQLMonitor:
         if self.client is None:
             # Initialize transport and client with basic configuration
             # Avoiding complex session management that causes "Session is closed" errors
-            self.transport = AIOHTTPTransport(
-                url=self.url,
-                timeout=self.timeout
-            )
+            self.transport = AIOHTTPTransport(url=self.url, timeout=self.timeout)
             self.client = Client(
                 transport=self.transport,
-                fetch_schema_from_transport=False  # Skip schema fetching for performance
+                fetch_schema_from_transport=False,  # Skip schema fetching for performance
             )
 
         return self.client
 
-    async def query(self, query_string: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def query(
+        self, query_string: str, variables: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Execute a GraphQL query with retry logic.
 
         Args:
@@ -92,15 +91,17 @@ class GraphQLMonitor:
                     "Executing GraphQL query",
                     url=self.url,
                     attempt=attempt + 1,
-                    query=query_string[:100] + "..." if len(query_string) > 100 else query_string
+                    query=query_string[:100] + "..."
+                    if len(query_string) > 100
+                    else query_string,
                 )
 
-                result = await client.execute_async(query_obj, variable_values=variables)
+                result = await client.execute_async(
+                    query_obj, variable_values=variables
+                )
 
                 logger.debug(
-                    "GraphQL query successful",
-                    url=self.url,
-                    attempt=attempt + 1
+                    "GraphQL query successful", url=self.url, attempt=attempt + 1
                 )
 
                 return result
@@ -111,7 +112,7 @@ class GraphQLMonitor:
                     url=self.url,
                     attempt=attempt + 1,
                     error=str(e),
-                    will_retry=attempt < self.max_retries
+                    will_retry=attempt < self.max_retries,
                 )
 
                 if attempt == self.max_retries:
@@ -119,25 +120,25 @@ class GraphQLMonitor:
                         "GraphQL query failed after all retries",
                         url=self.url,
                         max_retries=self.max_retries,
-                        error=str(e)
+                        error=str(e),
                     )
                     raise
 
                 # Exponential backoff
-                await asyncio.sleep(2 ** attempt)
+                await asyncio.sleep(2**attempt)
 
             except Exception as e:
                 logger.error(
                     "Unexpected error during GraphQL query",
                     url=self.url,
                     attempt=attempt + 1,
-                    error=str(e)
+                    error=str(e),
                 )
 
                 if attempt == self.max_retries:
                     raise
 
-                await asyncio.sleep(2 ** attempt)
+                await asyncio.sleep(2**attempt)
 
         # This should never be reached
         raise RuntimeError("Query failed after all retries")
@@ -166,9 +167,7 @@ class GraphQLMonitor:
 
         except Exception as e:
             logger.warning(
-                "GraphQL endpoint health check failed",
-                url=self.url,
-                error=str(e)
+                "GraphQL endpoint health check failed", url=self.url, error=str(e)
             )
             return False
 

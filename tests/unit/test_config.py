@@ -14,7 +14,7 @@ class TestActionConfig:
         config = ActionConfig(
             trigger={"field": "health", "condition": "equals", "value": "unhealthy"},
             action="restart_pod",
-            parameters={"gracePeriod": 30}
+            parameters={"gracePeriod": 30},
         )
 
         assert config.trigger["field"] == "health"
@@ -25,7 +25,7 @@ class TestActionConfig:
         """Test action config with default parameters."""
         config = ActionConfig(
             trigger={"field": "health", "condition": "equals", "value": "unhealthy"},
-            action="restart_pod"
+            action="restart_pod",
         )
 
         assert config.parameters == {}
@@ -37,8 +37,7 @@ class TestTAppConfig:
     def test_valid_tapp_config(self):
         """Test creating valid TApp config."""
         config = TAppConfig(
-            selector={"matchLabels": {"app": "test"}},
-            state_query="query { status }"
+            selector={"matchLabels": {"app": "test"}}, state_query="query { status }"
         )
 
         assert config.selector == {"matchLabels": {"app": "test"}}
@@ -55,7 +54,7 @@ class TestTAppConfig:
             polling_interval=60,
             state_query="query { status }",
             timeout=20,
-            max_retries=5
+            max_retries=5,
         )
 
         assert config.graphql_endpoint == "/api/graphql"
@@ -69,7 +68,7 @@ class TestTAppConfig:
         config = TAppConfig(
             selector={"matchLabels": {"app": "test"}},
             state_query="query { status }",
-            polling_interval=30
+            polling_interval=30,
         )
         assert config.polling_interval == 30
 
@@ -78,7 +77,7 @@ class TestTAppConfig:
             TAppConfig(
                 selector={"matchLabels": {"app": "test"}},
                 state_query="query { status }",
-                polling_interval=1
+                polling_interval=1,
             )
 
         # Too high
@@ -86,7 +85,7 @@ class TestTAppConfig:
             TAppConfig(
                 selector={"matchLabels": {"app": "test"}},
                 state_query="query { status }",
-                polling_interval=5000
+                polling_interval=5000,
             )
 
     def test_timeout_validation(self):
@@ -95,7 +94,7 @@ class TestTAppConfig:
         config = TAppConfig(
             selector={"matchLabels": {"app": "test"}},
             state_query="query { status }",
-            timeout=30
+            timeout=30,
         )
         assert config.timeout == 30
 
@@ -104,7 +103,7 @@ class TestTAppConfig:
             TAppConfig(
                 selector={"matchLabels": {"app": "test"}},
                 state_query="query { status }",
-                timeout=0
+                timeout=0,
             )
 
         # Too high
@@ -112,7 +111,7 @@ class TestTAppConfig:
             TAppConfig(
                 selector={"matchLabels": {"app": "test"}},
                 state_query="query { status }",
-                timeout=100
+                timeout=100,
             )
 
 
@@ -142,7 +141,7 @@ class TestOperatorSettings:
             log_format="plain",
             graphql_timeout=5,
             metrics_port=9090,
-            namespace="kco-system"
+            namespace="kco-system",
         )
 
         assert settings.log_level == "DEBUG"
@@ -172,10 +171,7 @@ class TestOperatorSettings:
     def test_timeout_validation(self):
         """Test timeout validation."""
         # Valid timeouts
-        settings = OperatorSettings(
-            graphql_timeout=30,
-            action_execution_timeout=600
-        )
+        settings = OperatorSettings(graphql_timeout=30, action_execution_timeout=600)
         assert settings.graphql_timeout == 30
         assert settings.action_execution_timeout == 600
 

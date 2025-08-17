@@ -25,8 +25,7 @@ class PatchResourceAction(ActionHandler):
         """Check if this action can handle the given context."""
         # Check if trigger condition is met
         return self._evaluate_trigger_condition(
-            context.state_change,
-            context.trigger_config
+            context.state_change, context.trigger_config
         )
 
     async def execute(self, context: ActionContext) -> ActionResult:
@@ -43,7 +42,7 @@ class PatchResourceAction(ActionHandler):
                     status=ActionStatus.FAILED,
                     message="Missing required parameter: resourceType",
                     details={},
-                    execution_time_seconds=0
+                    execution_time_seconds=0,
                 )
 
             if not resource_name:
@@ -51,7 +50,7 @@ class PatchResourceAction(ActionHandler):
                     status=ActionStatus.FAILED,
                     message="Missing required parameter: resourceName",
                     details={},
-                    execution_time_seconds=0
+                    execution_time_seconds=0,
                 )
 
             if not patch_data:
@@ -59,7 +58,7 @@ class PatchResourceAction(ActionHandler):
                     status=ActionStatus.FAILED,
                     message="Missing required parameter: patchData",
                     details={},
-                    execution_time_seconds=0
+                    execution_time_seconds=0,
                 )
 
             # Determine which API client to use based on resource type
@@ -72,67 +71,64 @@ class PatchResourceAction(ActionHandler):
 
                     if resource_type.lower() == "pod":
                         await api_client.patch_namespaced_pod(
-                            name=resource_name,
-                            namespace=namespace,
-                            body=patch_data
+                            name=resource_name, namespace=namespace, body=patch_data
                         )
                     elif resource_type.lower() == "service":
                         await api_client.patch_namespaced_service(
-                            name=resource_name,
-                            namespace=namespace,
-                            body=patch_data
+                            name=resource_name, namespace=namespace, body=patch_data
                         )
                     elif resource_type.lower() == "configmap":
                         await api_client.patch_namespaced_config_map(
-                            name=resource_name,
-                            namespace=namespace,
-                            body=patch_data
+                            name=resource_name, namespace=namespace, body=patch_data
                         )
                     elif resource_type.lower() == "secret":
                         await api_client.patch_namespaced_secret(
-                            name=resource_name,
-                            namespace=namespace,
-                            body=patch_data
+                            name=resource_name, namespace=namespace, body=patch_data
                         )
 
-                elif resource_type.lower() in ["deployment", "replicaset", "daemonset", "statefulset"]:
+                elif resource_type.lower() in [
+                    "deployment",
+                    "replicaset",
+                    "daemonset",
+                    "statefulset",
+                ]:
                     # Apps API resources
                     api_client = self.k8s_client.apps_v1
 
                     if resource_type.lower() == "deployment":
                         await api_client.patch_namespaced_deployment(
-                            name=resource_name,
-                            namespace=namespace,
-                            body=patch_data
+                            name=resource_name, namespace=namespace, body=patch_data
                         )
                     elif resource_type.lower() == "replicaset":
                         await api_client.patch_namespaced_replica_set(
-                            name=resource_name,
-                            namespace=namespace,
-                            body=patch_data
+                            name=resource_name, namespace=namespace, body=patch_data
                         )
                     elif resource_type.lower() == "daemonset":
                         await api_client.patch_namespaced_daemon_set(
-                            name=resource_name,
-                            namespace=namespace,
-                            body=patch_data
+                            name=resource_name, namespace=namespace, body=patch_data
                         )
                     elif resource_type.lower() == "statefulset":
                         await api_client.patch_namespaced_stateful_set(
-                            name=resource_name,
-                            namespace=namespace,
-                            body=patch_data
+                            name=resource_name, namespace=namespace, body=patch_data
                         )
 
                 else:
                     return ActionResult(
                         status=ActionStatus.FAILED,
                         message=f"Unsupported resource type: {resource_type}",
-                        details={"supported_types": [
-                            "pod", "service", "configmap", "secret",
-                            "deployment", "replicaset", "daemonset", "statefulset"
-                        ]},
-                        execution_time_seconds=0
+                        details={
+                            "supported_types": [
+                                "pod",
+                                "service",
+                                "configmap",
+                                "secret",
+                                "deployment",
+                                "replicaset",
+                                "daemonset",
+                                "statefulset",
+                            ]
+                        },
+                        execution_time_seconds=0,
                     )
 
                 logger.info(
@@ -140,7 +136,7 @@ class PatchResourceAction(ActionHandler):
                     resource_type=resource_type,
                     resource_name=resource_name,
                     namespace=namespace,
-                    tapp=context.state_change.tapp_name
+                    tapp=context.state_change.tapp_name,
                 )
 
                 return ActionResult(
@@ -150,9 +146,9 @@ class PatchResourceAction(ActionHandler):
                         "resource_type": resource_type,
                         "resource_name": resource_name,
                         "namespace": namespace,
-                        "patch_data": patch_data
+                        "patch_data": patch_data,
                     },
-                    execution_time_seconds=0  # Will be set by registry
+                    execution_time_seconds=0,  # Will be set by registry
                 )
 
             except client.ApiException as e:
@@ -171,22 +167,22 @@ class PatchResourceAction(ActionHandler):
                         "api_error": {
                             "status": e.status,
                             "reason": e.reason,
-                            "body": e.body
+                            "body": e.body,
                         }
                     },
-                    execution_time_seconds=0
+                    execution_time_seconds=0,
                 )
 
         except Exception as e:
             logger.error(
                 "Error in patch resource action",
                 error=str(e),
-                tapp=context.state_change.tapp_name
+                tapp=context.state_change.tapp_name,
             )
 
             return ActionResult(
                 status=ActionStatus.FAILED,
                 message=f"Failed to patch resource: {str(e)}",
                 details={"error": str(e)},
-                execution_time_seconds=0
+                execution_time_seconds=0,
             )

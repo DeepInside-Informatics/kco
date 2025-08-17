@@ -28,11 +28,7 @@ class EventGenerator:
         logger.info("Initialized EventGenerator")
 
     def _get_event_key(
-        self,
-        namespace: str,
-        tapp_name: str,
-        reason: str,
-        message: str
+        self, namespace: str, tapp_name: str, reason: str, message: str
     ) -> str:
         """Generate a unique key for event deduplication."""
         return f"{namespace}/{tapp_name}/{reason}/{hash(message)}"
@@ -45,7 +41,8 @@ class EventGenerator:
             # Clean up old events
             cutoff = now.timestamp() - self._deduplication_window_seconds
             keys_to_remove = [
-                key for key, timestamp in self._recent_events.items()
+                key
+                for key, timestamp in self._recent_events.items()
                 if timestamp.timestamp() < cutoff
             ]
             for key in keys_to_remove:
@@ -56,7 +53,7 @@ class EventGenerator:
                 logger.debug(
                     "Skipping duplicate event",
                     event_key=event_key,
-                    last_seen=self._recent_events[event_key]
+                    last_seen=self._recent_events[event_key],
                 )
                 return False
 
@@ -81,10 +78,7 @@ class EventGenerator:
         message = f"Initial state detected for TApp '{state_change.tapp_name}'"
 
         event_key = self._get_event_key(
-            state_change.namespace,
-            state_change.tapp_name,
-            reason,
-            message
+            state_change.namespace, state_change.tapp_name, reason, message
         )
 
         if await self._should_create_event(event_key):
@@ -95,13 +89,13 @@ class EventGenerator:
                     involved_object_kind="TargetApp",
                     reason=reason,
                     message=message,
-                    event_type="Normal"
+                    event_type="Normal",
                 )
 
                 logger.info(
                     "Generated initial state event",
                     namespace=state_change.namespace,
-                    tapp=state_change.tapp_name
+                    tapp=state_change.tapp_name,
                 )
 
             except Exception as e:
@@ -109,7 +103,7 @@ class EventGenerator:
                     "Failed to create initial state event",
                     namespace=state_change.namespace,
                     tapp=state_change.tapp_name,
-                    error=str(e)
+                    error=str(e),
                 )
 
     async def _generate_change_events(self, state_change: StateChange) -> None:
@@ -130,10 +124,7 @@ class EventGenerator:
         event_type = self._determine_event_type(changed_fields_list, state_change)
 
         event_key = self._get_event_key(
-            state_change.namespace,
-            state_change.tapp_name,
-            reason,
-            message
+            state_change.namespace, state_change.tapp_name, reason, message
         )
 
         if await self._should_create_event(event_key):
@@ -144,7 +135,7 @@ class EventGenerator:
                     involved_object_kind="TargetApp",
                     reason=reason,
                     message=message,
-                    event_type=event_type
+                    event_type=event_type,
                 )
 
                 logger.info(
@@ -152,7 +143,7 @@ class EventGenerator:
                     namespace=state_change.namespace,
                     tapp=state_change.tapp_name,
                     changed_fields=changed_fields_list,
-                    event_type=event_type
+                    event_type=event_type,
                 )
 
             except Exception as e:
@@ -160,31 +151,32 @@ class EventGenerator:
                     "Failed to create state change event",
                     namespace=state_change.namespace,
                     tapp=state_change.tapp_name,
-                    error=str(e)
+                    error=str(e),
                 )
 
         # Generate specific events for critical field changes
         await self._generate_specific_field_events(state_change)
 
     def _determine_event_type(
-        self,
-        changed_fields: list,
-        state_change: StateChange
+        self, changed_fields: list, state_change: StateChange
     ) -> str:
         """Determine event type based on changed fields and values."""
         # Check for fields that typically indicate problems
-        warning_fields = {
-            "health", "status", "error", "errors", "failed", "failure"
-        }
+        warning_fields = {"health", "status", "error", "errors", "failed", "failure"}
 
         for field in changed_fields:
             field_lower = field.lower()
             if any(warning in field_lower for warning in warning_fields):
                 # Check the actual value to determine severity
-                current_value = self._get_field_value(state_change.new_snapshot.data, field)
+                current_value = self._get_field_value(
+                    state_change.new_snapshot.data, field
+                )
                 if current_value and isinstance(current_value, str):
                     value_lower = current_value.lower()
-                    if any(bad in value_lower for bad in ["error", "failed", "unhealthy", "down"]):
+                    if any(
+                        bad in value_lower
+                        for bad in ["error", "failed", "unhealthy", "down"]
+                    ):
                         return "Warning"
 
         return "Normal"
@@ -195,31 +187,32 @@ class EventGenerator:
             "health": "HealthStatusChanged",
             "status": "StatusChanged",
             "error": "ErrorStateChanged",
-            "errors": "ErrorsDetected"
+            "errors": "ErrorsDetected",
         }
 
         for field in state_change.changed_fields:
-            field_name = field.split(".")[-1].lower()  # Get the last part of nested field
+            field_name = field.split(".")[
+                -1
+            ].lower()  # Get the last part of nested field
 
             if field_name in critical_fields:
                 reason = critical_fields[field_name]
 
                 old_value = self._get_field_value(
                     state_change.old_snapshot.data if state_change.old_snapshot else {},
-                    field
+                    field,
                 )
                 new_value = self._get_field_value(state_change.new_snapshot.data, field)
 
                 message = f"Field '{field}' changed from '{old_value}' to '{new_value}' in TApp '{state_change.tapp_name}'"
 
                 # Determine event type based on new value
-                event_type = "Warning" if self._is_problematic_value(new_value) else "Normal"
+                event_type = (
+                    "Warning" if self._is_problematic_value(new_value) else "Normal"
+                )
 
                 event_key = self._get_event_key(
-                    state_change.namespace,
-                    state_change.tapp_name,
-                    reason,
-                    message
+                    state_change.namespace, state_change.tapp_name, reason, message
                 )
 
                 if await self._should_create_event(event_key):
@@ -230,7 +223,7 @@ class EventGenerator:
                             involved_object_kind="TargetApp",
                             reason=reason,
                             message=message,
-                            event_type=event_type
+                            event_type=event_type,
                         )
 
                         logger.info(
@@ -239,7 +232,7 @@ class EventGenerator:
                             tapp=state_change.tapp_name,
                             field=field,
                             reason=reason,
-                            event_type=event_type
+                            event_type=event_type,
                         )
 
                     except Exception as e:
@@ -248,7 +241,7 @@ class EventGenerator:
                             namespace=state_change.namespace,
                             tapp=state_change.tapp_name,
                             field=field,
-                            error=str(e)
+                            error=str(e),
                         )
 
     def _get_field_value(self, data: dict, field_path: str) -> str:
@@ -271,8 +264,15 @@ class EventGenerator:
 
         value_lower = str(value).lower()
         problematic_keywords = [
-            "error", "failed", "failure", "unhealthy", "down",
-            "critical", "fatal", "exception", "timeout"
+            "error",
+            "failed",
+            "failure",
+            "unhealthy",
+            "down",
+            "critical",
+            "fatal",
+            "exception",
+            "timeout",
         ]
 
         return any(keyword in value_lower for keyword in problematic_keywords)
@@ -281,5 +281,5 @@ class EventGenerator:
         """Get event generator statistics."""
         return {
             "cached_events": len(self._recent_events),
-            "deduplication_window_seconds": self._deduplication_window_seconds
+            "deduplication_window_seconds": self._deduplication_window_seconds,
         }

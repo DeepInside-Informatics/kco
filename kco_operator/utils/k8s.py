@@ -18,15 +18,12 @@ class KubernetesClient:
         self.custom_objects = client.CustomObjectsApi()
 
     async def get_pods_by_selector(
-        self,
-        namespace: str,
-        label_selector: str
+        self, namespace: str, label_selector: str
     ) -> list[client.V1Pod]:
         """Get pods matching the label selector."""
         try:
             response = await self.core_v1.list_namespaced_pod(
-                namespace=namespace,
-                label_selector=label_selector
+                namespace=namespace, label_selector=label_selector
             )
             return response.items
         except Exception as e:
@@ -34,7 +31,7 @@ class KubernetesClient:
                 "Failed to get pods by selector",
                 namespace=namespace,
                 selector=label_selector,
-                error=str(e)
+                error=str(e),
             )
             raise
 
@@ -45,20 +42,19 @@ class KubernetesClient:
         involved_object_kind: str,
         reason: str,
         message: str,
-        event_type: str = "Normal"
+        event_type: str = "Normal",
     ) -> None:
         """Create a Kubernetes Event."""
         from datetime import datetime
 
         event = client.CoreV1Event(
             metadata=client.V1ObjectMeta(
-                generate_name=f"{involved_object_name}-",
-                namespace=namespace
+                generate_name=f"{involved_object_name}-", namespace=namespace
             ),
             involved_object=client.V1ObjectReference(
                 kind=involved_object_kind,
                 name=involved_object_name,
-                namespace=namespace
+                namespace=namespace,
             ),
             reason=reason,
             message=message,
@@ -66,20 +62,17 @@ class KubernetesClient:
             first_timestamp=datetime.now(UTC),
             last_timestamp=datetime.now(UTC),
             count=1,
-            source=client.V1EventSource(component="kco-operator")
+            source=client.V1EventSource(component="kco-operator"),
         )
 
         try:
-            await self.core_v1.create_namespaced_event(
-                namespace=namespace,
-                body=event
-            )
+            await self.core_v1.create_namespaced_event(namespace=namespace, body=event)
             logger.info(
                 "Created Kubernetes Event",
                 namespace=namespace,
                 object=involved_object_name,
                 reason=reason,
-                type=event_type
+                type=event_type,
             )
         except Exception as e:
             logger.error(
@@ -87,22 +80,18 @@ class KubernetesClient:
                 namespace=namespace,
                 object=involved_object_name,
                 reason=reason,
-                error=str(e)
+                error=str(e),
             )
             raise
 
     async def scale_deployment(
-        self,
-        namespace: str,
-        deployment_name: str,
-        replicas: int
+        self, namespace: str, deployment_name: str, replicas: int
     ) -> None:
         """Scale a deployment to the specified number of replicas."""
         try:
             # Get current deployment
             deployment = await self.apps_v1.read_namespaced_deployment(
-                name=deployment_name,
-                namespace=namespace
+                name=deployment_name, namespace=namespace
             )
 
             # Update replicas
@@ -110,16 +99,14 @@ class KubernetesClient:
 
             # Apply the update
             await self.apps_v1.patch_namespaced_deployment(
-                name=deployment_name,
-                namespace=namespace,
-                body=deployment
+                name=deployment_name, namespace=namespace, body=deployment
             )
 
             logger.info(
                 "Scaled deployment",
                 namespace=namespace,
                 deployment=deployment_name,
-                replicas=replicas
+                replicas=replicas,
             )
         except Exception as e:
             logger.error(
@@ -127,36 +114,28 @@ class KubernetesClient:
                 namespace=namespace,
                 deployment=deployment_name,
                 replicas=replicas,
-                error=str(e)
+                error=str(e),
             )
             raise
 
     async def restart_pod(
-        self,
-        namespace: str,
-        pod_name: str,
-        grace_period: int = 30
+        self, namespace: str, pod_name: str, grace_period: int = 30
     ) -> None:
         """Restart a pod by deleting it (assuming it's managed by a controller)."""
         try:
             await self.core_v1.delete_namespaced_pod(
-                name=pod_name,
-                namespace=namespace,
-                grace_period_seconds=grace_period
+                name=pod_name, namespace=namespace, grace_period_seconds=grace_period
             )
 
             logger.info(
                 "Deleted pod for restart",
                 namespace=namespace,
                 pod=pod_name,
-                grace_period=grace_period
+                grace_period=grace_period,
             )
         except Exception as e:
             logger.error(
-                "Failed to restart pod",
-                namespace=namespace,
-                pod=pod_name,
-                error=str(e)
+                "Failed to restart pod", namespace=namespace, pod=pod_name, error=str(e)
             )
             raise
 

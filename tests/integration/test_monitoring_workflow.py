@@ -63,7 +63,9 @@ async def mock_k8s_client():
 @pytest.fixture
 async def monitoring_controller(mock_k8s_client):
     """Provide a MonitoringController for testing."""
-    controller = MonitoringController(mock_k8s_client, rate_limit_rpm=1000)  # High limit for testing
+    controller = MonitoringController(
+        mock_k8s_client, rate_limit_rpm=1000
+    )  # High limit for testing
     yield controller
     await controller.shutdown()
 
@@ -72,11 +74,7 @@ async def monitoring_controller(mock_k8s_client):
 def sample_tapp_spec():
     """Provide sample TApp specification."""
     return {
-        "selector": {
-            "matchLabels": {
-                "app": "test-app"
-            }
-        },
+        "selector": {"matchLabels": {"app": "test-app"}},
         "graphqlEndpoint": "/graphql",
         "pollingInterval": 5,  # Minimum valid polling interval
         "stateQuery": """
@@ -92,16 +90,14 @@ def sample_tapp_spec():
                 "trigger": {
                     "field": "application.health",
                     "condition": "equals",
-                    "value": "unhealthy"
+                    "value": "unhealthy",
                 },
                 "action": "restart_pod",
-                "parameters": {
-                    "gracePeriod": 30
-                }
+                "parameters": {"gracePeriod": 30},
             }
         ],
         "timeout": 5,
-        "maxRetries": 2
+        "maxRetries": 2,
     }
 
 
@@ -109,7 +105,9 @@ class TestMonitoringWorkflow:
     """Test the complete monitoring workflow."""
 
     @pytest.mark.asyncio
-    async def test_basic_monitoring_lifecycle(self, monitoring_controller, sample_tapp_spec):
+    async def test_basic_monitoring_lifecycle(
+        self, monitoring_controller, sample_tapp_spec
+    ):
         """Test basic monitoring start/stop lifecycle."""
         namespace = "default"
         name = "test-app"
@@ -131,7 +129,9 @@ class TestMonitoringWorkflow:
         assert len(stats["monitored_tapps"]) == 0
 
     @pytest.mark.asyncio
-    async def test_state_change_detection(self, monitoring_controller, sample_tapp_spec, mock_k8s_client):
+    async def test_state_change_detection(
+        self, monitoring_controller, sample_tapp_spec, mock_k8s_client
+    ):
         """Test state change detection and event generation."""
         namespace = "default"
         name = "test-app"
@@ -140,26 +140,29 @@ class TestMonitoringWorkflow:
         mock_server = MockGraphQLServer()
 
         # Initial response
-        mock_server.set_response({
-            "application": {
-                "status": "running",
-                "health": "healthy"
-            }
-        })
+        mock_server.set_response(
+            {"application": {"status": "running", "health": "healthy"}}
+        )
 
         # Changed response
-        mock_server.set_response({
-            "application": {
-                "status": "running",
-                "health": "unhealthy"  # This should trigger an action
+        mock_server.set_response(
+            {
+                "application": {
+                    "status": "running",
+                    "health": "unhealthy",  # This should trigger an action
+                }
             }
-        })
+        )
 
-        with patch('kco_operator.monitors.graphql.GraphQLMonitor') as MockGraphQLMonitor:
+        with patch(
+            "kco_operator.monitors.graphql.GraphQLMonitor"
+        ) as MockGraphQLMonitor:
             MockGraphQLMonitor.return_value = mock_server
 
             # Start monitoring
-            await monitoring_controller.start_monitoring(namespace, name, sample_tapp_spec)
+            await monitoring_controller.start_monitoring(
+                namespace, name, sample_tapp_spec
+            )
 
             # Wait for a few polling cycles
             await asyncio.sleep(2.5)
@@ -220,8 +223,7 @@ class TestMonitoringWorkflow:
         """Test that rate limiting is applied."""
         # Create controller with very low rate limit
         low_limit_controller = MonitoringController(
-            monitoring_controller.k8s_client,
-            rate_limit_rpm=1  # Very low limit
+            monitoring_controller.k8s_client, rate_limit_rpm=1  # Very low limit
         )
 
         try:
@@ -245,7 +247,9 @@ class TestMonitoringWorkflow:
             await low_limit_controller.shutdown()
 
     @pytest.mark.asyncio
-    async def test_error_handling(self, monitoring_controller, sample_tapp_spec, mock_k8s_client):
+    async def test_error_handling(
+        self, monitoring_controller, sample_tapp_spec, mock_k8s_client
+    ):
         """Test error handling in monitoring."""
         namespace = "default"
         name = "test-app"
@@ -268,13 +272,13 @@ class TestTAppConfig:
         """Test parsing valid TApp configuration."""
         # Convert camelCase to snake_case for TAppConfig
         converted_spec = {
-            'selector': sample_tapp_spec.get('selector', {}),
-            'graphql_endpoint': sample_tapp_spec.get('graphqlEndpoint', '/graphql'),
-            'polling_interval': sample_tapp_spec.get('pollingInterval', 30),
-            'state_query': sample_tapp_spec.get('stateQuery', ''),
-            'actions': sample_tapp_spec.get('actions', []),
-            'timeout': sample_tapp_spec.get('timeout', 10),
-            'max_retries': sample_tapp_spec.get('maxRetries', 3)
+            "selector": sample_tapp_spec.get("selector", {}),
+            "graphql_endpoint": sample_tapp_spec.get("graphqlEndpoint", "/graphql"),
+            "polling_interval": sample_tapp_spec.get("pollingInterval", 30),
+            "state_query": sample_tapp_spec.get("stateQuery", ""),
+            "actions": sample_tapp_spec.get("actions", []),
+            "timeout": sample_tapp_spec.get("timeout", 10),
+            "max_retries": sample_tapp_spec.get("maxRetries", 3),
         }
         config = TAppConfig.model_validate(converted_spec)
 
@@ -289,7 +293,7 @@ class TestTAppConfig:
         """Test that default values are applied correctly."""
         minimal_spec = {
             "selector": {"matchLabels": {"app": "test"}},
-            "stateQuery": "query { status }"
+            "stateQuery": "query { status }",
         }
 
         config = TAppConfig.model_validate(minimal_spec)
@@ -303,15 +307,19 @@ class TestTAppConfig:
     def test_invalid_config_validation(self):
         """Test that invalid configurations are rejected."""
         with pytest.raises(ValueError):  # Should raise validation error
-            TAppConfig.model_validate({
-                "selector": {"matchLabels": {"app": "test"}},
-                "stateQuery": "query { status }",
-                "pollingInterval": 3601  # Too high
-            })
+            TAppConfig.model_validate(
+                {
+                    "selector": {"matchLabels": {"app": "test"}},
+                    "stateQuery": "query { status }",
+                    "pollingInterval": 3601,  # Too high
+                }
+            )
 
         with pytest.raises(ValueError):  # Should raise validation error
-            TAppConfig.model_validate({
-                "selector": {"matchLabels": {"app": "test"}},
-                "stateQuery": "query { status }",
-                "timeout": 0  # Too low
-            })
+            TAppConfig.model_validate(
+                {
+                    "selector": {"matchLabels": {"app": "test"}},
+                    "stateQuery": "query { status }",
+                    "timeout": 0,  # Too low
+                }
+            )

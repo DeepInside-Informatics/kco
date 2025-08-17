@@ -49,7 +49,7 @@ class TestStateChange:
             tapp_name="test-app",
             namespace="default",
             old_snapshot=None,
-            new_snapshot=new_snapshot
+            new_snapshot=new_snapshot,
         )
 
         assert change.is_initial
@@ -65,7 +65,7 @@ class TestStateChange:
             namespace="default",
             old_snapshot=old_snapshot,
             new_snapshot=new_snapshot,
-            changed_fields={"status"}
+            changed_fields={"status"},
         )
 
         assert not change.is_initial
@@ -81,7 +81,7 @@ class TestStateChange:
             namespace="default",
             old_snapshot=old_snapshot,
             new_snapshot=new_snapshot,
-            changed_fields=set()
+            changed_fields=set(),
         )
 
         assert not change.is_initial
@@ -140,13 +140,7 @@ class TestStateManager:
         """Test detection of nested field changes."""
         # Initial state with nested data
         initial_data = {
-            "application": {
-                "status": "running",
-                "metrics": {
-                    "cpu": 50,
-                    "memory": 1024
-                }
-            }
+            "application": {"status": "running", "metrics": {"cpu": 50, "memory": 1024}}
         }
         await state_manager.update_state("default", "test-app", initial_data)
 
@@ -154,10 +148,7 @@ class TestStateManager:
         updated_data = {
             "application": {
                 "status": "running",
-                "metrics": {
-                    "cpu": 75,  # Changed
-                    "memory": 1024
-                }
+                "metrics": {"cpu": 75, "memory": 1024},  # Changed
             }
         }
         change = await state_manager.update_state("default", "test-app", updated_data)

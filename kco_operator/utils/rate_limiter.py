@@ -70,10 +70,7 @@ class RateLimiter:
         self.buckets: dict[str, RateLimitBucket] = {}
         self._lock = asyncio.Lock()
 
-        logger.info(
-            "Initialized RateLimiter",
-            requests_per_minute=requests_per_minute
-        )
+        logger.info("Initialized RateLimiter", requests_per_minute=requests_per_minute)
 
     def _get_bucket_key(self, namespace: str, tapp_name: str) -> str:
         """Generate bucket key for TApp."""
@@ -91,14 +88,14 @@ class RateLimiter:
                     capacity=capacity,
                     tokens=capacity,
                     last_refill=now,
-                    refill_rate=refill_rate
+                    refill_rate=refill_rate,
                 )
 
                 logger.debug(
                     "Created rate limit bucket",
                     key=key,
                     capacity=capacity,
-                    refill_rate=refill_rate
+                    refill_rate=refill_rate,
                 )
 
             return self.buckets[key]
@@ -108,7 +105,7 @@ class RateLimiter:
         namespace: str,
         tapp_name: str,
         tokens: int = 1,
-        timeout: float | None = None
+        timeout: float | None = None,
     ) -> bool:
         """Acquire tokens from rate limiter.
 
@@ -131,7 +128,7 @@ class RateLimiter:
                 namespace=namespace,
                 tapp=tapp_name,
                 tokens=tokens,
-                remaining_tokens=bucket.tokens
+                remaining_tokens=bucket.tokens,
             )
             return True
 
@@ -142,7 +139,7 @@ class RateLimiter:
                 namespace=namespace,
                 tapp=tapp_name,
                 tokens=tokens,
-                remaining_tokens=bucket.tokens
+                remaining_tokens=bucket.tokens,
             )
             return False
 
@@ -154,7 +151,7 @@ class RateLimiter:
                 namespace=namespace,
                 tapp=tapp_name,
                 wait_time=wait_time,
-                timeout=timeout
+                timeout=timeout,
             )
             return False
 
@@ -163,7 +160,7 @@ class RateLimiter:
             namespace=namespace,
             tapp=tapp_name,
             wait_time=wait_time,
-            tokens=tokens
+            tokens=tokens,
         )
 
         await asyncio.sleep(wait_time)
@@ -175,7 +172,7 @@ class RateLimiter:
                 namespace=namespace,
                 tapp=tapp_name,
                 tokens=tokens,
-                remaining_tokens=bucket.tokens
+                remaining_tokens=bucket.tokens,
             )
             return True
 
@@ -183,7 +180,7 @@ class RateLimiter:
             "Failed to acquire rate limit tokens after waiting",
             namespace=namespace,
             tapp=tapp_name,
-            tokens=tokens
+            tokens=tokens,
         )
         return False
 
@@ -209,7 +206,7 @@ class RateLimiter:
                 logger.info(
                     "Cleaned up expired rate limit buckets",
                     count=len(expired_keys),
-                    remaining=len(self.buckets)
+                    remaining=len(self.buckets),
                 )
 
     def get_stats(self) -> dict[str, int]:
@@ -220,5 +217,5 @@ class RateLimiter:
         """
         return {
             "active_buckets": len(self.buckets),
-            "requests_per_minute": self.requests_per_minute
+            "requests_per_minute": self.requests_per_minute,
         }

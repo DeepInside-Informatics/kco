@@ -42,7 +42,8 @@ async def startup(**kwargs: Any) -> None:
         logger.warning("Failed to load in-cluster config", error=str(e))
         # Only try local config if we're not in a pod
         import os
-        if os.path.exists('/var/run/secrets/kubernetes.io/serviceaccount'):
+
+        if os.path.exists("/var/run/secrets/kubernetes.io/serviceaccount"):
             logger.error("Running in pod but in-cluster config failed", error=str(e))
             sys.exit(1)
         else:
@@ -50,20 +51,23 @@ async def startup(**kwargs: Any) -> None:
                 config.load_kube_config()
                 logger.info("Loaded local Kubernetes configuration")
             except Exception as local_e:
-                logger.error("Failed to load any Kubernetes configuration",
-                           incluster_error=str(e), local_error=str(local_e))
+                logger.error(
+                    "Failed to load any Kubernetes configuration",
+                    incluster_error=str(e),
+                    local_error=str(local_e),
+                )
                 sys.exit(1)
 
     # Initialize global clients
     k8s_client = KubernetesClient()
 
     # Debug settings
-    logger.info("Initializing monitoring controller",
-                rate_limit=settings.rate_limit_requests)
+    logger.info(
+        "Initializing monitoring controller", rate_limit=settings.rate_limit_requests
+    )
 
     monitoring_controller = MonitoringController(
-        k8s_client,
-        rate_limit_rpm=settings.rate_limit_requests
+        k8s_client, rate_limit_rpm=settings.rate_limit_requests
     )
 
     # Import built-in actions to register them
@@ -101,15 +105,17 @@ async def cleanup(**kwargs: Any) -> None:
         await k8s_client.close()
 
 
-@kopf.on.create('operator.kco.local', 'v1alpha1', 'targetapps')
-async def create_targetapp(body: dict[str, Any], name: str, namespace: str, **kwargs: Any) -> dict[str, Any]:
+@kopf.on.create("operator.kco.local", "v1alpha1", "targetapps")
+async def create_targetapp(
+    body: dict[str, Any], name: str, namespace: str, **kwargs: Any
+) -> dict[str, Any]:
     """Handle TargetApp creation."""
     global monitoring_controller
 
     logger.info("Creating TargetApp", name=name, namespace=namespace)
 
     try:
-        spec = body.get('spec', {})
+        spec = body.get("spec", {})
 
         # Start monitoring
         await monitoring_controller.start_monitoring(namespace, name, spec)
@@ -120,15 +126,15 @@ async def create_targetapp(body: dict[str, Any], name: str, namespace: str, **kw
             "lastPolled": None,
             "lastError": None,
             "actionsExecuted": 0,
-            "eventsGenerated": 0
+            "eventsGenerated": 0,
         }
 
         logger.info(
             "TargetApp monitoring started",
             name=name,
             namespace=namespace,
-            endpoint=spec.get('graphqlEndpoint', '/graphql'),
-            interval=spec.get('pollingInterval', 30)
+            endpoint=spec.get("graphqlEndpoint", "/graphql"),
+            interval=spec.get("pollingInterval", 30),
         )
 
         return {"status": status}
@@ -139,7 +145,7 @@ async def create_targetapp(body: dict[str, Any], name: str, namespace: str, **kw
             "Failed to create TargetApp",
             name=name,
             namespace=namespace,
-            error=error_msg
+            error=error_msg,
         )
 
         return {
@@ -148,36 +154,29 @@ async def create_targetapp(body: dict[str, Any], name: str, namespace: str, **kw
                 "lastError": error_msg,
                 "lastPolled": None,
                 "actionsExecuted": 0,
-                "eventsGenerated": 0
+                "eventsGenerated": 0,
             }
         }
 
 
-@kopf.on.update('operator.kco.local', 'v1alpha1', 'targetapps')
-async def update_targetapp(body: dict[str, Any], name: str, namespace: str, **kwargs: Any) -> dict[str, Any]:
+@kopf.on.update("operator.kco.local", "v1alpha1", "targetapps")
+async def update_targetapp(
+    body: dict[str, Any], name: str, namespace: str, **kwargs: Any
+) -> dict[str, Any]:
     """Handle TargetApp updates."""
     global monitoring_controller
 
     logger.info("Updating TargetApp", name=name, namespace=namespace)
 
     try:
-        spec = body.get('spec', {})
+        spec = body.get("spec", {})
 
         # Update monitoring configuration
         await monitoring_controller.update_monitoring(namespace, name, spec)
 
-        logger.info(
-            "TargetApp monitoring updated",
-            name=name,
-            namespace=namespace
-        )
+        logger.info("TargetApp monitoring updated", name=name, namespace=namespace)
 
-        return {
-            "status": {
-                "state": "Monitoring",
-                "lastError": None
-            }
-        }
+        return {"status": {"state": "Monitoring", "lastError": None}}
 
     except Exception as e:
         error_msg = f"Failed to update monitoring: {str(e)}"
@@ -185,19 +184,16 @@ async def update_targetapp(body: dict[str, Any], name: str, namespace: str, **kw
             "Failed to update TargetApp",
             name=name,
             namespace=namespace,
-            error=error_msg
+            error=error_msg,
         )
 
-        return {
-            "status": {
-                "state": "Failed",
-                "lastError": error_msg
-            }
-        }
+        return {"status": {"state": "Failed", "lastError": error_msg}}
 
 
-@kopf.on.delete('operator.kco.local', 'v1alpha1', 'targetapps')
-async def delete_targetapp(body: dict[str, Any], name: str, namespace: str, **kwargs: Any) -> None:
+@kopf.on.delete("operator.kco.local", "v1alpha1", "targetapps")
+async def delete_targetapp(
+    body: dict[str, Any], name: str, namespace: str, **kwargs: Any
+) -> None:
     """Handle TargetApp deletion."""
     global monitoring_controller
 
@@ -207,18 +203,14 @@ async def delete_targetapp(body: dict[str, Any], name: str, namespace: str, **kw
         # Stop monitoring
         await monitoring_controller.stop_monitoring(namespace, name)
 
-        logger.info(
-            "TargetApp monitoring stopped",
-            name=name,
-            namespace=namespace
-        )
+        logger.info("TargetApp monitoring stopped", name=name, namespace=namespace)
 
     except Exception as e:
         logger.error(
             "Error during TargetApp deletion",
             name=name,
             namespace=namespace,
-            error=str(e)
+            error=str(e),
         )
 
 
@@ -227,7 +219,9 @@ def main() -> None:
     # Configure kopf settings
     kopf.configure(
         verbose=settings.log_level == "DEBUG",
-        log_format=kopf.LogFormat.JSON if settings.log_format == "json" else kopf.LogFormat.PLAIN,
+        log_format=kopf.LogFormat.JSON
+        if settings.log_format == "json"
+        else kopf.LogFormat.PLAIN,
     )
 
     # Run the operator

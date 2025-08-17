@@ -18,32 +18,31 @@ logger = structlog.get_logger(__name__)
 
 # Prometheus metrics
 POLLS_TOTAL = Counter(
-    'operator_kco_tapp_polls_total',
-    'Total number of GraphQL polls executed',
-    ['namespace', 'tapp_name', 'status']
+    "operator_kco_tapp_polls_total",
+    "Total number of GraphQL polls executed",
+    ["namespace", "tapp_name", "status"],
 )
 
 POLL_DURATION = Histogram(
-    'operator_kco_tapp_poll_duration_seconds',
-    'Time spent polling GraphQL endpoints',
-    ['namespace', 'tapp_name']
+    "operator_kco_tapp_poll_duration_seconds",
+    "Time spent polling GraphQL endpoints",
+    ["namespace", "tapp_name"],
 )
 
 EVENTS_GENERATED = Counter(
-    'operator_kco_events_generated_total',
-    'Total number of Kubernetes Events generated',
-    ['namespace', 'tapp_name', 'event_type']
+    "operator_kco_events_generated_total",
+    "Total number of Kubernetes Events generated",
+    ["namespace", "tapp_name", "event_type"],
 )
 
 ACTIONS_EXECUTED = Counter(
-    'operator_kco_actions_executed_total',
-    'Total number of actions executed',
-    ['namespace', 'tapp_name', 'action', 'status']
+    "operator_kco_actions_executed_total",
+    "Total number of actions executed",
+    ["namespace", "tapp_name", "action", "status"],
 )
 
 ACTIVE_MONITORS = Gauge(
-    'operator_kco_active_monitors',
-    'Number of active TApp monitors'
+    "operator_kco_active_monitors", "Number of active TApp monitors"
 )
 
 
@@ -58,7 +57,7 @@ class TAppMonitor:
         state_manager: StateManager,
         event_generator: EventGenerator,
         k8s_client: KubernetesClient,
-        rate_limiter: RateLimiter
+        rate_limiter: RateLimiter,
     ) -> None:
         """Initialize TApp monitor.
 
@@ -87,20 +86,26 @@ class TAppMonitor:
             "Initialized TApp monitor",
             namespace=namespace,
             tapp=name,
-            polling_interval=config.polling_interval
+            polling_interval=config.polling_interval,
         )
 
     async def start(self) -> None:
         """Start monitoring this TApp."""
         if self._monitor_task is not None:
-            logger.warning("TApp monitor already started", namespace=self.namespace, tapp=self.name)
+            logger.warning(
+                "TApp monitor already started", namespace=self.namespace, tapp=self.name
+            )
             return
 
         # Discover pods and create GraphQL monitor
         await self._initialize_graphql_monitor()
 
         if self.graphql_monitor is None:
-            logger.error("Failed to initialize GraphQL monitor", namespace=self.namespace, tapp=self.name)
+            logger.error(
+                "Failed to initialize GraphQL monitor",
+                namespace=self.namespace,
+                tapp=self.name,
+            )
             return
 
         # Start monitoring loop
@@ -109,7 +114,9 @@ class TAppMonitor:
 
     async def stop(self) -> None:
         """Stop monitoring this TApp."""
-        logger.info("Stopping TApp monitoring", namespace=self.namespace, tapp=self.name)
+        logger.info(
+            "Stopping TApp monitoring", namespace=self.namespace, tapp=self.name
+        )
 
         # Signal stop
         self._stop_event.set()
@@ -137,20 +144,20 @@ class TAppMonitor:
         """Initialize GraphQL monitor by discovering pods or using direct URL."""
         try:
             # Check if graphqlEndpoint is a full URL
-            if self.config.graphql_endpoint.startswith(('http://', 'https://')):
+            if self.config.graphql_endpoint.startswith(("http://", "https://")):
                 # Direct URL - use as-is (for external endpoints, port-forwarded, etc.)
                 self.graphql_monitor = GraphQLMonitor(
                     base_url="",  # Empty base_url since we have the full URL
                     endpoint=self.config.graphql_endpoint,
                     timeout=self.config.timeout,
-                    max_retries=self.config.max_retries
+                    max_retries=self.config.max_retries,
                 )
 
                 logger.info(
                     "Initialized GraphQL monitor with direct URL",
                     namespace=self.namespace,
                     tapp=self.name,
-                    url=self.config.graphql_endpoint
+                    url=self.config.graphql_endpoint,
                 )
                 return
 
@@ -161,8 +168,7 @@ class TAppMonitor:
 
             # Find pods
             pods = await self.k8s_client.get_pods_by_selector(
-                namespace=self.namespace,
-                label_selector=label_selector
+                namespace=self.namespace, label_selector=label_selector
             )
 
             if not pods:
@@ -170,7 +176,7 @@ class TAppMonitor:
                     "No pods found for TApp",
                     namespace=self.namespace,
                     tapp=self.name,
-                    selector=label_selector
+                    selector=label_selector,
                 )
                 return
 
@@ -181,7 +187,7 @@ class TAppMonitor:
                     "Pod has no IP address",
                     namespace=self.namespace,
                     tapp=self.name,
-                    pod=pod.metadata.name
+                    pod=pod.metadata.name,
                 )
                 return
 
@@ -192,7 +198,7 @@ class TAppMonitor:
                 base_url=base_url,
                 endpoint=self.config.graphql_endpoint,
                 timeout=self.config.timeout,
-                max_retries=self.config.max_retries
+                max_retries=self.config.max_retries,
             )
 
             logger.info(
@@ -200,7 +206,7 @@ class TAppMonitor:
                 namespace=self.namespace,
                 tapp=self.name,
                 pod=pod.metadata.name,
-                url=f"{base_url}{self.config.graphql_endpoint}"
+                url=f"{base_url}{self.config.graphql_endpoint}",
             )
 
         except Exception as e:
@@ -208,12 +214,14 @@ class TAppMonitor:
                 "Failed to initialize GraphQL monitor",
                 namespace=self.namespace,
                 tapp=self.name,
-                error=str(e)
+                error=str(e),
             )
 
     async def _monitoring_loop(self) -> None:
         """Main monitoring loop."""
-        logger.info("Starting monitoring loop", namespace=self.namespace, tapp=self.name)
+        logger.info(
+            "Starting monitoring loop", namespace=self.namespace, tapp=self.name
+        )
 
         while not self._stop_event.is_set():
             try:
@@ -222,12 +230,12 @@ class TAppMonitor:
                     logger.warning(
                         "GraphQL endpoint health check failed",
                         namespace=self.namespace,
-                        tapp=self.name
+                        tapp=self.name,
                     )
                     POLLS_TOTAL.labels(
                         namespace=self.namespace,
                         tapp_name=self.name,
-                        status="health_check_failed"
+                        status="health_check_failed",
                     ).inc()
                 else:
                     # Execute state query and process changes
@@ -236,8 +244,7 @@ class TAppMonitor:
                 # Wait for next poll interval
                 try:
                     await asyncio.wait_for(
-                        self._stop_event.wait(),
-                        timeout=self.config.polling_interval
+                        self._stop_event.wait(), timeout=self.config.polling_interval
                     )
                     break  # Stop event was set
                 except asyncio.TimeoutError:
@@ -248,19 +255,17 @@ class TAppMonitor:
                     "Error in monitoring loop",
                     namespace=self.namespace,
                     tapp=self.name,
-                    error=str(e)
+                    error=str(e),
                 )
                 POLLS_TOTAL.labels(
-                    namespace=self.namespace,
-                    tapp_name=self.name,
-                    status="error"
+                    namespace=self.namespace, tapp_name=self.name, status="error"
                 ).inc()
 
                 # Wait before retrying
                 try:
                     await asyncio.wait_for(
                         self._stop_event.wait(),
-                        timeout=min(30, self.config.polling_interval)
+                        timeout=min(30, self.config.polling_interval),
                     )
                     break
                 except asyncio.TimeoutError:
@@ -272,19 +277,15 @@ class TAppMonitor:
         """Poll GraphQL endpoint and process state changes."""
         # Apply rate limiting
         if not await self.rate_limiter.acquire(
-            self.namespace,
-            self.name,
-            timeout=self.config.polling_interval / 2
+            self.namespace, self.name, timeout=self.config.polling_interval / 2
         ):
             logger.warning(
                 "Rate limit exceeded, skipping poll",
                 namespace=self.namespace,
-                tapp=self.name
+                tapp=self.name,
             )
             POLLS_TOTAL.labels(
-                namespace=self.namespace,
-                tapp_name=self.name,
-                status="rate_limited"
+                namespace=self.namespace, tapp_name=self.name, status="rate_limited"
             ).inc()
             return
 
@@ -294,16 +295,12 @@ class TAppMonitor:
                 result = await self.graphql_monitor.query(self.config.state_query)
 
                 POLLS_TOTAL.labels(
-                    namespace=self.namespace,
-                    tapp_name=self.name,
-                    status="success"
+                    namespace=self.namespace, tapp_name=self.name, status="success"
                 ).inc()
 
                 # Update state and detect changes
                 state_change = await self.state_manager.update_state(
-                    self.namespace,
-                    self.name,
-                    result
+                    self.namespace, self.name, result
                 )
 
                 # Generate events for state changes
@@ -314,7 +311,7 @@ class TAppMonitor:
                     EVENTS_GENERATED.labels(
                         namespace=self.namespace,
                         tapp_name=self.name,
-                        event_type=event_type
+                        event_type=event_type,
                     ).inc()
 
                 # Execute actions if configured
@@ -326,7 +323,7 @@ class TAppMonitor:
                     "Failed to poll and process state",
                     namespace=self.namespace,
                     tapp=self.name,
-                    error=str(e)
+                    error=str(e),
                 )
                 raise
 
@@ -341,20 +338,19 @@ class TAppMonitor:
                     state_change=state_change,
                     trigger_config=action_config.trigger,
                     action_parameters=action_config.parameters,
-                    tapp_config=self.config.dict()
+                    tapp_config=self.config.dict(),
                 )
 
                 # Execute action
                 result = await action_registry.execute_action(
-                    action_config.action,
-                    context
+                    action_config.action, context
                 )
 
                 ACTIONS_EXECUTED.labels(
                     namespace=self.namespace,
                     tapp_name=self.name,
                     action=action_config.action,
-                    status=result.status.value
+                    status=result.status.value,
                 ).inc()
 
                 logger.info(
@@ -363,7 +359,7 @@ class TAppMonitor:
                     tapp=self.name,
                     action=action_config.action,
                     status=result.status.value,
-                    execution_time=result.execution_time_seconds
+                    execution_time=result.execution_time_seconds,
                 )
 
             except Exception as e:
@@ -372,14 +368,14 @@ class TAppMonitor:
                     namespace=self.namespace,
                     tapp=self.name,
                     action=action_config.action,
-                    error=str(e)
+                    error=str(e),
                 )
 
                 ACTIONS_EXECUTED.labels(
                     namespace=self.namespace,
                     tapp_name=self.name,
                     action=action_config.action,
-                    status="failed"
+                    status="failed",
                 ).inc()
 
 
@@ -405,16 +401,15 @@ class MonitoringController:
         # Start cleanup task
         self._cleanup_task = asyncio.create_task(self._cleanup_loop())
 
-        logger.info(
-            "Initialized MonitoringController",
-            rate_limit_rpm=rate_limit_rpm
-        )
+        logger.info("Initialized MonitoringController", rate_limit_rpm=rate_limit_rpm)
 
     def _get_monitor_key(self, namespace: str, name: str) -> str:
         """Generate unique key for monitor."""
         return f"{namespace}/{name}"
 
-    async def start_monitoring(self, namespace: str, name: str, spec: dict[str, Any]) -> None:
+    async def start_monitoring(
+        self, namespace: str, name: str, spec: dict[str, Any]
+    ) -> None:
         """Start monitoring a TargetApp.
 
         Args:
@@ -427,22 +422,20 @@ class MonitoringController:
 
             if monitor_key in self._monitors:
                 logger.warning(
-                    "Monitor already exists for TApp",
-                    namespace=namespace,
-                    tapp=name
+                    "Monitor already exists for TApp", namespace=namespace, tapp=name
                 )
                 return
 
             try:
                 # Convert camelCase fields to snake_case for TAppConfig
                 converted_spec = {
-                    'selector': spec.get('selector', {}),
-                    'graphql_endpoint': spec.get('graphqlEndpoint', '/graphql'),
-                    'polling_interval': spec.get('pollingInterval', 30),
-                    'state_query': spec.get('stateQuery', ''),
-                    'actions': spec.get('actions', []),
-                    'timeout': spec.get('timeout', 10),
-                    'max_retries': spec.get('maxRetries', 3)
+                    "selector": spec.get("selector", {}),
+                    "graphql_endpoint": spec.get("graphqlEndpoint", "/graphql"),
+                    "polling_interval": spec.get("pollingInterval", 30),
+                    "state_query": spec.get("stateQuery", ""),
+                    "actions": spec.get("actions", []),
+                    "timeout": spec.get("timeout", 10),
+                    "max_retries": spec.get("maxRetries", 3),
                 }
 
                 # Parse configuration
@@ -456,7 +449,7 @@ class MonitoringController:
                     state_manager=self.state_manager,
                     event_generator=self.event_generator,
                     k8s_client=self.k8s_client,
-                    rate_limiter=self.rate_limiter
+                    rate_limiter=self.rate_limiter,
                 )
 
                 await monitor.start()
@@ -468,7 +461,7 @@ class MonitoringController:
                     "Started monitoring TApp",
                     namespace=namespace,
                     tapp=name,
-                    total_monitors=len(self._monitors)
+                    total_monitors=len(self._monitors),
                 )
 
             except Exception as e:
@@ -476,7 +469,7 @@ class MonitoringController:
                     "Failed to start monitoring TApp",
                     namespace=namespace,
                     tapp=name,
-                    error=str(e)
+                    error=str(e),
                 )
                 raise
 
@@ -500,16 +493,16 @@ class MonitoringController:
                     "Stopped monitoring TApp",
                     namespace=namespace,
                     tapp=name,
-                    remaining_monitors=len(self._monitors)
+                    remaining_monitors=len(self._monitors),
                 )
             else:
                 logger.warning(
-                    "No monitor found for TApp",
-                    namespace=namespace,
-                    tapp=name
+                    "No monitor found for TApp", namespace=namespace, tapp=name
                 )
 
-    async def update_monitoring(self, namespace: str, name: str, spec: dict[str, Any]) -> None:
+    async def update_monitoring(
+        self, namespace: str, name: str, spec: dict[str, Any]
+    ) -> None:
         """Update monitoring configuration for a TargetApp.
 
         Args:
@@ -523,11 +516,7 @@ class MonitoringController:
         # Start with new configuration
         await self.start_monitoring(namespace, name, spec)
 
-        logger.info(
-            "Updated monitoring configuration",
-            namespace=namespace,
-            tapp=name
-        )
+        logger.info("Updated monitoring configuration", namespace=namespace, tapp=name)
 
     async def _cleanup_loop(self) -> None:
         """Periodic cleanup task for expired resources."""
@@ -573,5 +562,5 @@ class MonitoringController:
             "monitored_tapps": list(self._monitors.keys()),
             "state_manager_stats": self.state_manager.get_stats(),
             "event_generator_stats": self.event_generator.get_stats(),
-            "rate_limiter_stats": self.rate_limiter.get_stats()
+            "rate_limiter_stats": self.rate_limiter.get_stats(),
         }

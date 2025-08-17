@@ -25,10 +25,10 @@ class HealthCheckServer:
         self._monitoring_controller = None
 
         # Setup routes
-        self.app.router.add_get('/healthz', self._health_handler)
-        self.app.router.add_get('/readyz', self._readiness_handler)
-        self.app.router.add_get('/stats', self._stats_handler)
-        self.app.router.add_get('/metrics', self._metrics_handler)
+        self.app.router.add_get("/healthz", self._health_handler)
+        self.app.router.add_get("/readyz", self._readiness_handler)
+        self.app.router.add_get("/stats", self._stats_handler)
+        self.app.router.add_get("/metrics", self._metrics_handler)
 
         logger.info("Initialized HealthCheckServer", port=port)
 
@@ -41,7 +41,7 @@ class HealthCheckServer:
         self.runner = web.AppRunner(self.app)
         await self.runner.setup()
 
-        self.site = web.TCPSite(self.runner, '0.0.0.0', self.port)
+        self.site = web.TCPSite(self.runner, "0.0.0.0", self.port)
         await self.site.start()
 
         logger.info("Health check server started", port=self.port)
@@ -65,7 +65,7 @@ class HealthCheckServer:
             "status": "healthy",
             "timestamp": datetime.now(UTC).isoformat(),
             "uptime_seconds": (datetime.now(UTC) - self._startup_time).total_seconds(),
-            "version": "0.1.0"
+            "version": "0.1.0",
         }
 
         return web.json_response(health_data)
@@ -91,7 +91,7 @@ class HealthCheckServer:
         response_data = {
             "status": "ready" if ready else "not_ready",
             "timestamp": datetime.now(UTC).isoformat(),
-            "checks": checks
+            "checks": checks,
         }
 
         return web.json_response(response_data, status=status_code)
@@ -100,9 +100,11 @@ class HealthCheckServer:
         """Handle statistics requests."""
         stats = {
             "operator": {
-                "uptime_seconds": (datetime.now(UTC) - self._startup_time).total_seconds(),
+                "uptime_seconds": (
+                    datetime.now(UTC) - self._startup_time
+                ).total_seconds(),
                 "startup_time": self._startup_time.isoformat(),
-                "version": "0.1.0"
+                "version": "0.1.0",
             }
         }
 
@@ -128,22 +130,17 @@ class HealthCheckServer:
             # Generate Prometheus metrics
             metrics_data = generate_latest()
 
-            return web.Response(
-                body=metrics_data,
-                content_type=CONTENT_TYPE_LATEST
-            )
+            return web.Response(body=metrics_data, content_type=CONTENT_TYPE_LATEST)
 
         except ImportError:
             # Fallback if prometheus_client is not available
             return web.json_response(
-                {"error": "Prometheus client not available"},
-                status=503
+                {"error": "Prometheus client not available"}, status=503
             )
         except Exception as e:
             logger.error("Error generating metrics", error=str(e))
             return web.json_response(
-                {"error": f"Failed to generate metrics: {str(e)}"},
-                status=500
+                {"error": f"Failed to generate metrics: {str(e)}"}, status=500
             )
 
 
@@ -151,7 +148,9 @@ class HealthCheckServer:
 _health_server: HealthCheckServer | None = None
 
 
-async def start_health_server(port: int = 8081, monitoring_controller=None) -> HealthCheckServer:
+async def start_health_server(
+    port: int = 8081, monitoring_controller=None
+) -> HealthCheckServer:
     """Start the global health check server.
 
     Args:

@@ -54,11 +54,7 @@ class ActionHandler(ABC):
         self.name = name
         self.description = description
 
-        logger.info(
-            "Registered action handler",
-            action=name,
-            description=description
-        )
+        logger.info("Registered action handler", action=name, description=description)
 
     @abstractmethod
     async def can_handle(self, context: ActionContext) -> bool:
@@ -85,9 +81,7 @@ class ActionHandler(ABC):
         pass
 
     def _evaluate_trigger_condition(
-        self,
-        state_change: StateChange,
-        trigger_config: dict[str, Any]
+        self, state_change: StateChange, trigger_config: dict[str, Any]
     ) -> bool:
         """Evaluate if trigger condition is met.
 
@@ -103,10 +97,7 @@ class ActionHandler(ABC):
         expected_value = trigger_config.get("value")
 
         if not all([field, condition]):
-            logger.warning(
-                "Invalid trigger configuration",
-                trigger=trigger_config
-            )
+            logger.warning("Invalid trigger configuration", trigger=trigger_config)
             return False
 
         # Check if the field actually changed
@@ -142,9 +133,7 @@ class ActionHandler(ABC):
             return current_value is None
         else:
             logger.warning(
-                "Unknown trigger condition",
-                condition=condition,
-                field=field
+                "Unknown trigger condition", condition=condition, field=field
             )
             return False
 

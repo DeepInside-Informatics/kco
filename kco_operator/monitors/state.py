@@ -24,14 +24,10 @@ class StateSnapshot:
     def create(cls, data: dict[str, Any]) -> "StateSnapshot":
         """Create a new state snapshot from data."""
         # Create deterministic checksum of the data
-        json_str = json.dumps(data, sort_keys=True, separators=(',', ':'))
+        json_str = json.dumps(data, sort_keys=True, separators=(",", ":"))
         checksum = hashlib.sha256(json_str.encode()).hexdigest()
 
-        return cls(
-            timestamp=datetime.now(UTC),
-            data=data,
-            checksum=checksum
-        )
+        return cls(timestamp=datetime.now(UTC), data=data, checksum=checksum)
 
 
 @dataclass
@@ -72,10 +68,7 @@ class StateManager:
         return f"{namespace}/{name}"
 
     def _find_changed_fields(
-        self,
-        old_data: dict[str, Any],
-        new_data: dict[str, Any],
-        path: str = ""
+        self, old_data: dict[str, Any], new_data: dict[str, Any], path: str = ""
     ) -> set[str]:
         """Recursively find changed fields between two data structures."""
         changed_fields = set()
@@ -98,7 +91,9 @@ class StateManager:
 
                 if isinstance(old_value, dict) and isinstance(new_value, dict):
                     # Recursively check nested objects
-                    nested_changes = self._find_changed_fields(old_value, new_value, current_path)
+                    nested_changes = self._find_changed_fields(
+                        old_value, new_value, current_path
+                    )
                     changed_fields.update(nested_changes)
                 elif old_value != new_value:
                     # Value changed
@@ -107,10 +102,7 @@ class StateManager:
         return changed_fields
 
     async def update_state(
-        self,
-        namespace: str,
-        name: str,
-        new_data: dict[str, Any]
+        self, namespace: str, name: str, new_data: dict[str, Any]
     ) -> StateChange:
         """Update the state for a TApp and return detected changes.
 
@@ -132,8 +124,7 @@ class StateManager:
             if old_snapshot is not None:
                 if old_snapshot.checksum != new_snapshot.checksum:
                     changed_fields = self._find_changed_fields(
-                        old_snapshot.data,
-                        new_snapshot.data
+                        old_snapshot.data, new_snapshot.data
                     )
 
             # Update stored state
@@ -144,7 +135,7 @@ class StateManager:
                 namespace=namespace,
                 old_snapshot=old_snapshot,
                 new_snapshot=new_snapshot,
-                changed_fields=changed_fields
+                changed_fields=changed_fields,
             )
 
             if state_change.has_changes:
@@ -154,19 +145,21 @@ class StateManager:
                     tapp=name,
                     is_initial=state_change.is_initial,
                     changed_fields=list(changed_fields),
-                    checksum=new_snapshot.checksum[:8]
+                    checksum=new_snapshot.checksum[:8],
                 )
             else:
                 logger.debug(
                     "No state changes detected",
                     namespace=namespace,
                     tapp=name,
-                    checksum=new_snapshot.checksum[:8]
+                    checksum=new_snapshot.checksum[:8],
                 )
 
             return state_change
 
-    async def get_current_state(self, namespace: str, name: str) -> StateSnapshot | None:
+    async def get_current_state(
+        self, namespace: str, name: str
+    ) -> StateSnapshot | None:
         """Get the current state snapshot for a TApp.
 
         Args:
@@ -222,5 +215,6 @@ class StateManager:
             "memory_usage_mb": sum(
                 len(json.dumps(snapshot.data).encode())
                 for snapshot in self._states.values()
-            ) / (1024 * 1024)
+            )
+            / (1024 * 1024),
         }

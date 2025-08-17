@@ -27,7 +27,7 @@ def operator_settings():
         graphql_max_retries=2,
         default_polling_interval=10,
         metrics_enabled=False,
-        health_port=9999
+        health_port=9999,
     )
 
 
@@ -57,11 +57,7 @@ def mock_k8s_client():
 def sample_tapp_config():
     """Provide sample TApp configuration."""
     return {
-        "selector": {
-            "matchLabels": {
-                "app": "test-app"
-            }
-        },
+        "selector": {"matchLabels": {"app": "test-app"}},
         "graphqlEndpoint": "/graphql",
         "pollingInterval": 30,
         "stateQuery": """
@@ -77,14 +73,12 @@ def sample_tapp_config():
                 "trigger": {
                     "field": "application.health",
                     "condition": "equals",
-                    "value": "unhealthy"
+                    "value": "unhealthy",
                 },
                 "action": "restart_pod",
-                "parameters": {
-                    "gracePeriod": 30
-                }
+                "parameters": {"gracePeriod": 30},
             }
-        ]
+        ],
     }
 
 
@@ -97,7 +91,7 @@ def sample_graphql_response():
                 "status": "running",
                 "health": "healthy",
                 "version": "1.0.0",
-                "uptime": 3600
+                "uptime": 3600,
             }
         }
     }
@@ -110,8 +104,6 @@ def sample_pod():
 
     return V1Pod(
         metadata=V1ObjectMeta(
-            name="test-pod",
-            namespace="default",
-            labels={"app": "test-app"}
+            name="test-pod", namespace="default", labels={"app": "test-app"}
         )
     )

@@ -105,21 +105,23 @@ class ActionHandler(ABC):
             return False
 
         # Get current value from state
-        current_value = self._get_nested_value(state_change.new_snapshot.data, field)
+        current_value = self._get_nested_value(
+            state_change.new_snapshot.data, field or ""
+        )
 
         # Evaluate condition
         if condition == "equals":
-            return current_value == expected_value
+            return bool(current_value == expected_value)
         elif condition == "not_equals":
-            return current_value != expected_value
+            return bool(current_value != expected_value)
         elif condition == "greater_than":
             try:
-                return float(current_value) > float(expected_value)
+                return float(current_value or 0) > float(expected_value or 0)
             except (ValueError, TypeError):
                 return False
         elif condition == "less_than":
             try:
-                return float(current_value) < float(expected_value)
+                return float(current_value or 0) < float(expected_value or 0)
             except (ValueError, TypeError):
                 return False
         elif condition == "contains":

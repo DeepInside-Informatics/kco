@@ -4,7 +4,7 @@ import sys
 from typing import Any
 
 import kopf
-from kubernetes_asyncio import config
+from kubernetes_asyncio import config  # type: ignore
 from prometheus_client import start_http_server
 
 from .config import OperatorSettings
@@ -23,8 +23,8 @@ settings = OperatorSettings()
 logger = setup_logging(settings.log_level)
 
 # Global instances
-k8s_client: KubernetesClient = None
-monitoring_controller: MonitoringController = None
+k8s_client: KubernetesClient | None = None
+monitoring_controller: MonitoringController | None = None
 
 
 @kopf.on.startup()
@@ -105,7 +105,7 @@ async def cleanup(**kwargs: Any) -> None:
         await k8s_client.close()
 
 
-@kopf.on.create("operator.kco.local", "v1alpha1", "targetapps")
+@kopf.on.create("operator.kco.local", "v1alpha1", "targetapps")  # type: ignore
 async def create_targetapp(
     body: dict[str, Any], name: str, namespace: str, **kwargs: Any
 ) -> dict[str, Any]:
@@ -118,7 +118,8 @@ async def create_targetapp(
         spec = body.get("spec", {})
 
         # Start monitoring
-        await monitoring_controller.start_monitoring(namespace, name, spec)
+        if monitoring_controller:
+            await monitoring_controller.start_monitoring(namespace, name, spec)
 
         # Update status
         status = {
@@ -159,7 +160,7 @@ async def create_targetapp(
         }
 
 
-@kopf.on.update("operator.kco.local", "v1alpha1", "targetapps")
+@kopf.on.update("operator.kco.local", "v1alpha1", "targetapps")  # type: ignore
 async def update_targetapp(
     body: dict[str, Any], name: str, namespace: str, **kwargs: Any
 ) -> dict[str, Any]:
@@ -172,7 +173,8 @@ async def update_targetapp(
         spec = body.get("spec", {})
 
         # Update monitoring configuration
-        await monitoring_controller.update_monitoring(namespace, name, spec)
+        if monitoring_controller:
+            await monitoring_controller.update_monitoring(namespace, name, spec)
 
         logger.info("TargetApp monitoring updated", name=name, namespace=namespace)
 
@@ -190,7 +192,7 @@ async def update_targetapp(
         return {"status": {"state": "Failed", "lastError": error_msg}}
 
 
-@kopf.on.delete("operator.kco.local", "v1alpha1", "targetapps")
+@kopf.on.delete("operator.kco.local", "v1alpha1", "targetapps")  # type: ignore
 async def delete_targetapp(
     body: dict[str, Any], name: str, namespace: str, **kwargs: Any
 ) -> None:
@@ -201,7 +203,8 @@ async def delete_targetapp(
 
     try:
         # Stop monitoring
-        await monitoring_controller.stop_monitoring(namespace, name)
+        if monitoring_controller:
+            await monitoring_controller.stop_monitoring(namespace, name)
 
         logger.info("TargetApp monitoring stopped", name=name, namespace=namespace)
 

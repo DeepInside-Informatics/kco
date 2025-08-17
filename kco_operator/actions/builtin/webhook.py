@@ -153,9 +153,7 @@ class WebhookAction(ActionHandler):
                 execution_time_seconds=0,
             )
 
-    def _prepare_payload(
-        self, template: dict[str, Any], context: ActionContext
-    ) -> dict[str, Any]:
+    def _prepare_payload(self, template: dict[str, Any], context: ActionContext) -> Any:
         """Prepare webhook payload from template and context."""
         # Base payload with state change information
         payload = {
@@ -174,8 +172,10 @@ class WebhookAction(ActionHandler):
         }
 
         # Add old state if not initial
-        if not context.state_change.is_initial:
-            payload["stateChange"]["oldState"] = context.state_change.old_snapshot.data
+        if not context.state_change.is_initial and context.state_change.old_snapshot:
+            state_change_dict = payload["stateChange"]
+            if isinstance(state_change_dict, dict):
+                state_change_dict["oldState"] = context.state_change.old_snapshot.data
 
         # Merge with custom template
         if template:
@@ -189,7 +189,7 @@ class WebhookAction(ActionHandler):
         payload_str = payload_str.replace(
             "{{namespace}}", context.state_change.namespace
         )
-        payload_str = payload_str.replace("{{timestamp}}", payload["timestamp"])
+        payload_str = payload_str.replace("{{timestamp}}", str(payload["timestamp"]))
 
         # Support accessing state data
         new_state = context.state_change.new_snapshot.data

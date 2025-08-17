@@ -4,8 +4,8 @@ import asyncio
 from typing import Any
 
 import structlog
-from kubernetes_asyncio import client
-from kubernetes_asyncio.stream import WsApiClient
+from kubernetes_asyncio import client  # type: ignore
+from kubernetes_asyncio.stream import WsApiClient  # type: ignore
 
 from ...utils.k8s import KubernetesClient
 from ..base import ActionContext, ActionHandler, ActionResult, ActionStatus

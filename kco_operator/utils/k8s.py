@@ -1,9 +1,10 @@
 """Kubernetes API client utilities."""
 
 from datetime import UTC
+from typing import Any
 
 import structlog
-from kubernetes_asyncio import client
+from kubernetes_asyncio import client  # type: ignore
 
 logger = structlog.get_logger(__name__)
 
@@ -19,13 +20,13 @@ class KubernetesClient:
 
     async def get_pods_by_selector(
         self, namespace: str, label_selector: str
-    ) -> list[client.V1Pod]:
+    ) -> list[Any]:
         """Get pods matching the label selector."""
         try:
             response = await self.core_v1.list_namespaced_pod(
                 namespace=namespace, label_selector=label_selector
             )
-            return response.items
+            return list(response.items)
         except Exception as e:
             logger.error(
                 "Failed to get pods by selector",

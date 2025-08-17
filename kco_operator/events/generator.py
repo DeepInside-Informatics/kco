@@ -2,6 +2,7 @@
 
 import asyncio
 from datetime import UTC, datetime
+from typing import Any
 
 import structlog
 
@@ -158,7 +159,7 @@ class EventGenerator:
         await self._generate_specific_field_events(state_change)
 
     def _determine_event_type(
-        self, changed_fields: list, state_change: StateChange
+        self, changed_fields: list[str], state_change: StateChange
     ) -> str:
         """Determine event type based on changed fields and values."""
         # Check for fields that typically indicate problems
@@ -244,7 +245,7 @@ class EventGenerator:
                             error=str(e),
                         )
 
-    def _get_field_value(self, data: dict, field_path: str) -> str:
+    def _get_field_value(self, data: dict[str, Any], field_path: str) -> str:
         """Get field value as string for display."""
         try:
             value = data

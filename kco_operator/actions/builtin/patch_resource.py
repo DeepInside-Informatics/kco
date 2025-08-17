@@ -3,7 +3,7 @@
 import json
 
 import structlog
-from kubernetes_asyncio import client
+from kubernetes_asyncio import client  # type: ignore
 
 from ...utils.k8s import KubernetesClient
 from ..base import ActionContext, ActionHandler, ActionResult, ActionStatus

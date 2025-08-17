@@ -1,6 +1,7 @@
 """Health check utilities for the operator."""
 
 from datetime import UTC, datetime
+from typing import Any
 
 import structlog
 from aiohttp import web
@@ -32,7 +33,7 @@ class HealthCheckServer:
 
         logger.info("Initialized HealthCheckServer", port=port)
 
-    def set_monitoring_controller(self, controller) -> None:
+    def set_monitoring_controller(self, controller: Any) -> None:
         """Set monitoring controller for stats collection."""
         self._monitoring_controller = controller
 
@@ -149,7 +150,7 @@ _health_server: HealthCheckServer | None = None
 
 
 async def start_health_server(
-    port: int = 8081, monitoring_controller=None
+    port: int = 8081, monitoring_controller: Any = None
 ) -> HealthCheckServer:
     """Start the global health check server.
 

@@ -2,12 +2,13 @@
 
 import logging
 import sys
+from typing import Any
 
 import structlog
 from structlog.stdlib import LoggerFactory
 
 
-def setup_logging(log_level: str = "INFO") -> structlog.BoundLogger:
+def setup_logging(log_level: str = "INFO") -> Any:
     """Setup structured logging with structlog and stdlib logging."""
 
     # Configure stdlib logging

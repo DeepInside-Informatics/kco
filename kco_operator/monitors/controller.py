@@ -79,7 +79,7 @@ class TAppMonitor:
         self.rate_limiter = rate_limiter
 
         self.graphql_monitor: GraphQLMonitor | None = None
-        self._monitor_task: asyncio.Task | None = None
+        self._monitor_task: asyncio.Task[Any] | None = None
         self._stop_event = asyncio.Event()
 
         logger.info(
@@ -226,7 +226,10 @@ class TAppMonitor:
         while not self._stop_event.is_set():
             try:
                 # Perform health check
-                if not await self.graphql_monitor.health_check():
+                if (
+                    self.graphql_monitor
+                    and not await self.graphql_monitor.health_check()
+                ):
                     logger.warning(
                         "GraphQL endpoint health check failed",
                         namespace=self.namespace,
@@ -292,6 +295,8 @@ class TAppMonitor:
         with POLL_DURATION.labels(namespace=self.namespace, tapp_name=self.name).time():
             try:
                 # Execute state query
+                if not self.graphql_monitor:
+                    return
                 result = await self.graphql_monitor.query(self.config.state_query)
 
                 POLLS_TOTAL.labels(
@@ -327,7 +332,7 @@ class TAppMonitor:
                 )
                 raise
 
-    async def _process_actions(self, state_change) -> None:
+    async def _process_actions(self, state_change: Any) -> None:
         """Process configured actions for state changes."""
         action_registry = await get_action_registry()
 
@@ -396,7 +401,7 @@ class MonitoringController:
 
         self._monitors: dict[str, TAppMonitor] = {}
         self._lock = asyncio.Lock()
-        self._cleanup_task: asyncio.Task | None = None
+        self._cleanup_task: asyncio.Task[Any] | None = None
 
         # Start cleanup task
         self._cleanup_task = asyncio.create_task(self._cleanup_loop())

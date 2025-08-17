@@ -1,20 +1,21 @@
 """Configuration models using Pydantic."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 
 
 class ActionConfig(BaseModel):
     """Configuration for a single action."""
-    
-    trigger: Dict[str, Any] = Field(
+
+    trigger: dict[str, Any] = Field(
         description="State condition that triggers this action"
     )
     action: str = Field(
         description="Name of the action to execute"
     )
-    parameters: Dict[str, Any] = Field(
+    parameters: dict[str, Any] = Field(
         default_factory=dict,
         description="Action-specific parameters"
     )
@@ -22,8 +23,8 @@ class ActionConfig(BaseModel):
 
 class TAppConfig(BaseModel):
     """Configuration for a Target Application."""
-    
-    selector: Dict[str, Any] = Field(
+
+    selector: dict[str, Any] = Field(
         description="Label selector for TApp pods"
     )
     graphql_endpoint: str = Field(
@@ -39,7 +40,7 @@ class TAppConfig(BaseModel):
     state_query: str = Field(
         description="GraphQL query to fetch application state"
     )
-    actions: List[ActionConfig] = Field(
+    actions: list[ActionConfig] = Field(
         default_factory=list,
         description="List of actions to execute on state changes"
     )
@@ -59,7 +60,7 @@ class TAppConfig(BaseModel):
 
 class OperatorSettings(BaseSettings):
     """Global operator configuration settings."""
-    
+
     # Logging configuration
     log_level: str = Field(
         default="INFO",
@@ -69,7 +70,7 @@ class OperatorSettings(BaseSettings):
         default="json",
         description="Log format (json, plain)"
     )
-    
+
     # GraphQL configuration
     graphql_timeout: int = Field(
         default=10,
@@ -83,7 +84,7 @@ class OperatorSettings(BaseSettings):
         le=10,
         description="Default maximum number of GraphQL retry attempts"
     )
-    
+
     # Polling configuration
     default_polling_interval: int = Field(
         default=30,
@@ -91,7 +92,7 @@ class OperatorSettings(BaseSettings):
         le=3600,
         description="Default polling interval in seconds"
     )
-    
+
     # Action execution configuration
     action_execution_timeout: int = Field(
         default=300,
@@ -99,7 +100,7 @@ class OperatorSettings(BaseSettings):
         le=1800,
         description="Action execution timeout in seconds"
     )
-    
+
     # Metrics configuration
     metrics_enabled: bool = Field(
         default=True,
@@ -111,7 +112,7 @@ class OperatorSettings(BaseSettings):
         le=65535,
         description="Port for Prometheus metrics server"
     )
-    
+
     # Health check configuration
     health_port: int = Field(
         default=8081,
@@ -119,20 +120,20 @@ class OperatorSettings(BaseSettings):
         le=65535,
         description="Port for health check endpoint"
     )
-    
+
     # Kubernetes configuration
-    namespace: Optional[str] = Field(
+    namespace: str | None = Field(
         default=None,
         description="Namespace to monitor (None for cluster-wide)"
     )
-    
+
     # Rate limiting
     rate_limit_requests: int = Field(
         default=100,
         ge=1,
         description="Maximum requests per minute per TApp"
     )
-    
+
     class Config:
         """Pydantic configuration."""
         env_prefix = "KCO_"

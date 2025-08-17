@@ -1,9 +1,9 @@
 """Pytest configuration and fixtures for KCO Operator tests."""
 
 import asyncio
-import pytest
 from unittest.mock import AsyncMock, MagicMock
-from typing import Any, Dict
+
+import pytest
 
 from kco_operator.config import OperatorSettings
 from kco_operator.monitors.state import StateManager
@@ -42,14 +42,14 @@ async def state_manager():
 def mock_k8s_client():
     """Provide a mocked Kubernetes client."""
     client = MagicMock(spec=KubernetesClient)
-    
+
     # Mock async methods
     client.get_pods_by_selector = AsyncMock(return_value=[])
     client.create_event = AsyncMock()
     client.scale_deployment = AsyncMock()
     client.restart_pod = AsyncMock()
     client.close = AsyncMock()
-    
+
     return client
 
 
@@ -106,8 +106,8 @@ def sample_graphql_response():
 @pytest.fixture
 def sample_pod():
     """Provide sample Kubernetes pod object."""
-    from kubernetes_asyncio.client import V1Pod, V1ObjectMeta
-    
+    from kubernetes_asyncio.client import V1ObjectMeta, V1Pod
+
     return V1Pod(
         metadata=V1ObjectMeta(
             name="test-pod",

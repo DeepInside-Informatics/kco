@@ -1,29 +1,27 @@
 """Kubernetes API client utilities."""
 
-from typing import Any, Dict, List, Optional
-import asyncio
+from datetime import UTC
 
-from kubernetes_asyncio import client
 import structlog
-
+from kubernetes_asyncio import client
 
 logger = structlog.get_logger(__name__)
 
 
 class KubernetesClient:
     """Async Kubernetes API client wrapper."""
-    
+
     def __init__(self) -> None:
         """Initialize the Kubernetes client."""
         self.core_v1 = client.CoreV1Api()
         self.apps_v1 = client.AppsV1Api()
         self.custom_objects = client.CustomObjectsApi()
-    
+
     async def get_pods_by_selector(
-        self, 
-        namespace: str, 
+        self,
+        namespace: str,
         label_selector: str
-    ) -> List[client.V1Pod]:
+    ) -> list[client.V1Pod]:
         """Get pods matching the label selector."""
         try:
             response = await self.core_v1.list_namespaced_pod(
@@ -39,7 +37,7 @@ class KubernetesClient:
                 error=str(e)
             )
             raise
-    
+
     async def create_event(
         self,
         namespace: str,
@@ -50,9 +48,8 @@ class KubernetesClient:
         event_type: str = "Normal"
     ) -> None:
         """Create a Kubernetes Event."""
-        import time
-        from datetime import datetime, timezone
-        
+        from datetime import datetime
+
         event = client.CoreV1Event(
             metadata=client.V1ObjectMeta(
                 generate_name=f"{involved_object_name}-",
@@ -66,12 +63,12 @@ class KubernetesClient:
             reason=reason,
             message=message,
             type=event_type,
-            first_timestamp=datetime.now(timezone.utc),
-            last_timestamp=datetime.now(timezone.utc),
+            first_timestamp=datetime.now(UTC),
+            last_timestamp=datetime.now(UTC),
             count=1,
             source=client.V1EventSource(component="kco-operator")
         )
-        
+
         try:
             await self.core_v1.create_namespaced_event(
                 namespace=namespace,
@@ -93,7 +90,7 @@ class KubernetesClient:
                 error=str(e)
             )
             raise
-    
+
     async def scale_deployment(
         self,
         namespace: str,
@@ -107,17 +104,17 @@ class KubernetesClient:
                 name=deployment_name,
                 namespace=namespace
             )
-            
+
             # Update replicas
             deployment.spec.replicas = replicas
-            
+
             # Apply the update
             await self.apps_v1.patch_namespaced_deployment(
                 name=deployment_name,
                 namespace=namespace,
                 body=deployment
             )
-            
+
             logger.info(
                 "Scaled deployment",
                 namespace=namespace,
@@ -133,7 +130,7 @@ class KubernetesClient:
                 error=str(e)
             )
             raise
-    
+
     async def restart_pod(
         self,
         namespace: str,
@@ -147,7 +144,7 @@ class KubernetesClient:
                 namespace=namespace,
                 grace_period_seconds=grace_period
             )
-            
+
             logger.info(
                 "Deleted pod for restart",
                 namespace=namespace,
@@ -162,7 +159,7 @@ class KubernetesClient:
                 error=str(e)
             )
             raise
-    
+
     async def close(self) -> None:
         """Close the Kubernetes client connections."""
         await self.core_v1.api_client.close()

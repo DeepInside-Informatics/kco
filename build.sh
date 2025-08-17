@@ -111,7 +111,15 @@ push_image() {
             exit 1
         fi
         
-        REGISTRY_IMAGE="${REGISTRY}/${FULL_IMAGE_NAME}"
+        # Support both full registry paths and simple registry names
+        if [[ "${REGISTRY}" == *"/"* ]]; then
+            # Full path like ghcr.io/user/repo
+            REGISTRY_IMAGE="${REGISTRY}:${IMAGE_TAG}"
+        else
+            # Simple registry like ghcr.io
+            REGISTRY_IMAGE="${REGISTRY}/${FULL_IMAGE_NAME}"
+        fi
+        
         log_info "Tagging image for registry: ${REGISTRY_IMAGE}"
         ${CONTAINER_ENGINE} tag "${FULL_IMAGE_NAME}" "${REGISTRY_IMAGE}"
         
@@ -143,7 +151,13 @@ show_usage() {
     echo "Examples:"
     echo "  $0                    # Build kco:latest"
     echo "  $0 v1.0.0            # Build kco:v1.0.0"
-    echo "  PUSH=true REGISTRY=registry.example.com $0 v1.0.0"
+    echo "  $0 debug             # Build kco:debug"
+    echo ""
+    echo "  # Push to GitHub Container Registry"
+    echo "  PUSH=true REGISTRY=ghcr.io/deepinside-informatics/kco $0 v1.0.0"
+    echo ""
+    echo "  # Push to Docker Hub"
+    echo "  PUSH=true REGISTRY=docker.io/youruser $0 v1.0.0"
     echo ""
     echo "Container engine preference: Podman > Docker"
 }

@@ -30,12 +30,18 @@ KCO follows the controller pattern, continuously reconciling the desired state w
 
 #### Using Helm (Recommended)
 
-1. **Add the chart repository:**
+1. **Install from GitHub Container Registry:**
 ```bash
-# For local development
+# Install latest release
 helm install kco-operator ./charts/kco-operator \
   --namespace kco-system \
   --create-namespace
+
+# Install specific version
+helm install kco-operator ./charts/kco-operator \
+  --namespace kco-system \
+  --create-namespace \
+  --set image.tag=v1.0.0
 ```
 
 2. **Customize values (optional):**
@@ -58,11 +64,14 @@ kubectl apply -f crd.yaml
 
 2. **Deploy the operator:**
 ```bash
-# Build the image
-./build.sh
-
-# Deploy to cluster (customize namespace and image as needed)
+# Using the pre-built image from GHCR
 kubectl create namespace kco-system
+kubectl run kco-operator \
+  --image=ghcr.io/deepinside-informatics/kco:latest \
+  --namespace=kco-system
+
+# Or build locally and deploy
+./build.sh
 kubectl run kco-operator --image=kco:latest --namespace=kco-system
 ```
 
@@ -321,6 +330,49 @@ The project includes comprehensive testing capabilities:
 - **Container Testing**: Podman-based image builds and deployment
 
 For detailed testing instructions, see [TESTING.md](TESTING.md).
+
+## CI/CD Pipeline
+
+The project includes automated CI/CD with GitHub Actions:
+
+### Automated Builds
+
+- **Pull Requests**: Build and test (no image push)
+- **Main Branch**: Build, test, and push to `ghcr.io/deepinside-informatics/kco:main`
+- **Git Tags**: Build, test, push release images, and create GitHub releases
+
+### Container Images
+
+Pre-built images are available at GitHub Container Registry:
+
+```bash
+# Latest release
+podman pull ghcr.io/deepinside-informatics/kco:latest
+
+# Specific version
+podman pull ghcr.io/deepinside-informatics/kco:v1.0.0
+
+# Development builds
+podman pull ghcr.io/deepinside-informatics/kco:main
+```
+
+### Creating Releases
+
+To create a new release:
+
+```bash
+# Tag the release
+git tag v1.0.0
+git push origin v1.0.0
+
+# GitHub Actions will automatically:
+# 1. Build and test the code
+# 2. Create container images with version tags
+# 3. Push images to GitHub Container Registry
+# 4. Create a GitHub Release with changelog
+```
+
+For more details, see [docs/github-container-registry.md](docs/github-container-registry.md).
 
 ## Contributing
 

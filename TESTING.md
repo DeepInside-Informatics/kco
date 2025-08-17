@@ -35,7 +35,7 @@ kubectl cluster-info --context kind-kco-test
 
 ### 3. Build and Deploy Operator
 
-Build the operator image with Podman:
+Build the operator image with Podman and deploy to KinD:
 
 ```bash
 # Build operator image (prefers Podman over Docker)
@@ -52,6 +52,12 @@ helm install kco-operator ./charts/kco-operator \
   --set image.repository=localhost/kco \
   --set image.tag=debug \
   --set image.pullPolicy=IfNotPresent
+
+# Wait for operator to be ready
+kubectl wait --for=condition=available deployment/kco-operator -n kco-system --timeout=60s
+
+# Verify operator is running
+kubectl get pods -n kco-system
 ```
 
 ## Network Configuration for Testing
@@ -97,12 +103,37 @@ curl -X POST $NODE \
 Apply the test TargetApp that monitors your production GraphQL endpoint:
 
 ```bash
-# Deploy test TargetApp
+# Deploy basic monitoring test TargetApp
 kubectl apply -f test-targetapp.yaml
+
+# Or deploy Slack webhook integration test
+kubectl apply -f test-targetapp-slack.yaml
 
 # Verify resource creation
 kubectl get targetapp
 kubectl describe targetapp production-tapp-test
+```
+
+### 1.1 Webhook Action Testing
+
+For testing webhook actions (Slack integration):
+
+```bash
+# Deploy the Slack webhook test configuration
+kubectl apply -f test-targetapp-slack.yaml
+
+# Monitor logs for webhook execution
+kubectl logs -n kco-system -l app.kubernetes.io/name=kco-operator -f
+
+# Look for log entries like:
+# - "Sending webhook" with URL and method
+# - "Webhook sent successfully" with HTTP status 200
+# - "Action execution completed" with success status
+```
+
+**Expected Slack Message Format:**
+```
+🚨 KCO Operator Alert: TargetApp production-tapp-slack-test in namespace default has syncStatus=SYNCED at 2025-08-17T16:34:22.061598Z
 ```
 
 ### 2. Monitor Operator Logs
@@ -153,10 +184,21 @@ kubectl get targetapp production-tapp-test -o yaml
 The operator should:
 
 1. **Connect to GraphQL endpoint**: No connection errors in logs
-2. **Poll regularly**: Log entries every 15 seconds showing polling activity
+2. **Poll regularly**: Log entries every 30 seconds showing polling activity
 3. **Update TargetApp status**: Status field should show "Monitoring" state
 4. **Generate events**: Kubernetes events created for state changes
-5. **Health checks pass**: All health endpoints return 200 OK
+5. **Execute actions**: Webhook/other actions triggered when conditions are met
+6. **Health checks pass**: All health endpoints return 200 OK
+
+### Webhook Action Success Indicators
+
+For webhook actions, successful execution shows:
+
+1. **Action Detection**: Log entry "Action triggered" with webhook details
+2. **HTTP Request**: Log entry "Sending webhook" with URL and method
+3. **Success Response**: Log entry "Webhook sent successfully" with HTTP 200 status
+4. **Template Interpolation**: Variables like `{{tapp_name}}`, `{{syncStatus}}` are replaced with actual values
+5. **External Notification**: Message appears in target system (Slack channel, webhook endpoint)
 
 ### Log Examples
 
@@ -168,11 +210,14 @@ Successful operation logs:
 {"event": "State comparison completed", "changes_detected": 0}
 ```
 
-State change detection:
+State change detection and webhook execution:
 
 ```json
-{"event": "State change detected", "field": "syncStatus", "old_value": "SYNCED", "new_value": "CATCHING_UP"}
-{"event": "Action triggered", "action": "webhook", "target": "https://httpbin.org/post"}
+{"event": "State change detected", "field": "syncStatus", "old_value": "CATCHING_UP", "new_value": "SYNCED"}
+{"event": "Executing action", "action": "webhook", "tapp": "production-tapp-slack-test", "namespace": "default"}
+{"event": "Sending webhook", "url": "https://hooks.slack.com/services/.../...", "method": "POST"}
+{"event": "Webhook sent successfully", "status": 200, "url": "https://hooks.slack.com/services/.../..."}
+{"event": "Action execution completed", "action": "webhook", "status": "success", "execution_time": 0.285}
 ```
 
 ## Troubleshooting
@@ -200,13 +245,32 @@ State change detection:
    ```
    - Check RBAC permissions: `kubectl auth can-i create targetapps`
    - Verify operator service account has correct permissions
+   - Ensure Helm chart deployed with proper RBAC configuration
 
-4. **Image Pull Errors**
+3. **Webhook Action Failures**
+   ```
+   Error: Webhook failed with HTTP 403/404/500
+   ```
+   - Verify webhook URL is correct and accessible
+   - Check authentication tokens/credentials for webhook endpoint
+   - Test webhook URL manually: `curl -X POST $WEBHOOK_URL -H "Content-Type: application/json" -d '{"text": "Test message"}'`
+   - For Slack webhooks, ensure the webhook URL is active and has proper permissions
+
+4. **Template Variable Issues**
+   ```
+   Slack message shows: "syncStatus={{syncStatus}}" instead of "syncStatus=SYNCED"
+   ```
+   - Check that the GraphQL response contains the expected field names
+   - Verify template variables match available state fields
+   - Ensure webhook action code supports the specific template variables used
+
+5. **Image Pull Errors**
    ```
    Error: ErrImagePull
    ```
-   - Ensure image is loaded into KinD: `kind load docker-image localhost/kco:debug --name kco-test`
+   - Ensure image is loaded into KinD: `kind load image-archive /tmp/kco-debug.tar --name kco-test`
    - Check image pull policy is set to `IfNotPresent`
+   - Verify image exists in KinD: `podman exec kco-test-control-plane crictl images | grep kco`
 
 ### Debug Commands
 
@@ -229,8 +293,9 @@ kubectl auth can-i --list --as=system:serviceaccount:kco-system:kco-operator
 Clean up test resources:
 
 ```bash
-# Delete test TargetApp
+# Delete test TargetApps
 kubectl delete -f test-targetapp.yaml
+kubectl delete -f test-targetapp-slack.yaml  # if used
 
 # Uninstall operator
 helm uninstall kco-operator -n kco-system
@@ -282,10 +347,56 @@ kubectl logs -n kco-system -l app.kubernetes.io/name=kco-operator | grep "GraphQ
 kind delete cluster --name ci-test
 ```
 
+## Webhook Testing Examples
+
+### Slack Integration Test
+
+Example `test-targetapp-slack.yaml` configuration:
+
+```yaml
+apiVersion: operator.kco.local/v1alpha1
+kind: TargetApp
+metadata:
+  name: production-tapp-slack-test
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: production-tapp  # Can be dummy for direct URL mode
+  graphqlEndpoint: "http://192.168.1.46:3085/graphql"  # Direct URL
+  pollingInterval: 30
+  stateQuery: |
+    query MonitorSync {
+      syncStatus
+    }
+  actions:
+  - trigger:
+      field: "syncStatus"
+      condition: "equals"
+      value: "SYNCED"
+    action: "webhook"
+    parameters:
+      url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+      method: "POST"
+      payload:
+        text: "🚨 KCO Operator Alert: TargetApp {{tapp_name}} in namespace {{namespace}} has syncStatus={{syncStatus}} at {{timestamp}}"
+```
+
+### Testing Template Variables
+
+Supported template variables in webhook payloads:
+- `{{tapp_name}}` → `production-tapp-slack-test`
+- `{{namespace}}` → `default`
+- `{{timestamp}}` → `2025-08-17T16:34:22.061598Z`
+- `{{syncStatus}}` → `SYNCED` (from GraphQL response)
+- Additional fields from GraphQL response can be accessed by field name
+
 ## Notes
 
 - **Default Container Engine**: Podman is preferred over Docker for all operations
 - **Network Configuration**: KinD with Podman uses different networking than Docker
-- **Host Access**: Use gateway IP (10.89.0.1) to access host services from cluster
+- **Host Access**: Use gateway IP (typically 10.89.0.1) to access host services from cluster  
 - **Port Forwarding**: Required for production TApp access during testing
 - **Environment Variables**: $NODE must be configured before testing
+- **Webhook Testing**: Use real webhook URLs (Slack, Discord, etc.) for complete E2E validation
+- **Template Interpolation**: Webhook payloads support dynamic variable substitution from state data

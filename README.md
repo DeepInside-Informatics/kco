@@ -9,10 +9,13 @@ KCO follows the controller pattern, continuously reconciling the desired state w
 ## Features
 
 - **GraphQL Monitoring**: Async polling of application GraphQL endpoints with configurable intervals
-- **State Change Detection**: Intelligent diffing and caching to detect meaningful state transitions
+- **State Change Detection**: Intelligent diffing and caching to detect meaningful state transitions  
 - **Event Generation**: Automatic Kubernetes Event creation for state changes with deduplication
-- **Pluggable Actions**: Extensible action system with built-in handlers for common operations
+- **Pluggable Actions**: Extensible action system with 5 built-in handlers for common operations
+- **Webhook Integration**: HTTP webhook notifications with template variable support (Slack, PagerDuty, etc.)
+- **Direct URL Support**: Monitor external GraphQL endpoints via direct URLs (port-forwarded, external services)
 - **Production Ready**: Structured logging, Prometheus metrics, health checks, and graceful shutdown
+- **Container Optimized**: Podman-first build system with KinD deployment support
 
 ## Quick Start
 
@@ -80,24 +83,28 @@ spec:
   selector:
     matchLabels:
       app: my-app
-  graphqlEndpoint: "/graphql"
+  # GraphQL endpoint - supports relative paths or direct URLs
+  graphqlEndpoint: "/graphql"  # or "http://external-service:8080/graphql"
   pollingInterval: 30
   stateQuery: |
     query AppState {
+      syncStatus
       application {
-        status
         health
         pendingTasks
       }
     }
   actions:
   - trigger:
-      field: "application.health"
+      field: "syncStatus"
       condition: "equals"
-      value: "unhealthy"
-    action: "restart_pod"
+      value: "SYNCED"
+    action: "webhook"
     parameters:
-      gracePeriod: 30
+      url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+      method: "POST"
+      payload:
+        text: "✅ {{tapp_name}} is now synced at {{timestamp}}"
 ```
 
 ## Development
@@ -114,9 +121,40 @@ poetry run pytest
 # Run operator locally (requires kubeconfig)
 poetry run python -m kco_operator.main
 
-# Build container image
+# Build container image (uses Podman by default)
 ./build.sh
+
+# Build for local testing
+./build.sh debug
 ```
+
+### Local Testing with KinD
+
+For complete testing with a local Kubernetes cluster:
+
+```bash
+# Create KinD cluster
+kind create cluster --name kco-test
+
+# Build and load operator image
+./build.sh debug
+podman save localhost/kco:debug -o /tmp/kco-debug.tar
+kind load image-archive /tmp/kco-debug.tar --name kco-test
+
+# Deploy operator via Helm
+helm install kco-operator ./charts/kco-operator \
+  --namespace kco-system \
+  --create-namespace \
+  --set image.repository=localhost/kco \
+  --set image.tag=debug \
+  --set image.pullPolicy=IfNotPresent
+
+# Test with production GraphQL endpoint (requires port-forwarding)
+export NODE=localhost:3085/graphql
+kubectl apply -f test-targetapp.yaml
+```
+
+See [TESTING.md](TESTING.md) for comprehensive testing instructions.
 
 ### Architecture
 
@@ -131,24 +169,29 @@ The operator consists of three main layers:
 - **`restart_pod`**: Restart pods by deleting them (requires controller to recreate)
 - **`scale_deployment`**: Scale deployments to specified replica count
 - **`patch_resource`**: Apply patches to Kubernetes resources
-- **`webhook`**: Send HTTP webhook notifications to external systems
+- **`webhook`**: Send HTTP webhook notifications to external systems (Slack, PagerDuty, custom APIs)
 - **`exec_command`**: Execute commands inside target application pods
 
 ### Action Examples
 
-#### Webhook Action
+#### Webhook Action with Template Variables
 ```yaml
 action: "webhook"
 parameters:
   url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
   method: "POST"
   timeout: 30
-  headers:
-    Content-Type: "application/json"
   payload:
-    text: "Alert: {{tapp_name}} health changed"
+    text: "🚨 KCO Alert: {{tapp_name}} in {{namespace}} has syncStatus={{syncStatus}} at {{timestamp}}"
     channel: "#alerts"
 ```
+
+**Supported Template Variables:**
+- `{{tapp_name}}` - TargetApp resource name
+- `{{namespace}}` - TargetApp namespace
+- `{{timestamp}}` - ISO timestamp of state change
+- `{{syncStatus}}` - Direct access to syncStatus field from GraphQL response
+- Additional state fields can be accessed by name if present in the GraphQL response
 
 #### Command Execution
 ```yaml
@@ -166,8 +209,22 @@ The operator can be configured via environment variables with the `KCO_` prefix:
 
 - `KCO_LOG_LEVEL`: Log level (DEBUG, INFO, WARNING, ERROR)
 - `KCO_GRAPHQL_TIMEOUT`: Default GraphQL timeout in seconds
-- `KCO_METRICS_PORT`: Prometheus metrics port (default: 8080)
+- `KCO_METRICS_PORT`: Prometheus metrics port (default: 8080) 
 - `KCO_HEALTH_PORT`: Health check port (default: 8081)
+
+### GraphQL Endpoint Configuration
+
+The operator supports two modes for GraphQL endpoint configuration:
+
+1. **Pod Discovery Mode** (default): Uses `selector` to find pods and appends `graphqlEndpoint` path
+   ```yaml
+   graphqlEndpoint: "/graphql"  # Relative path
+   ```
+
+2. **Direct URL Mode**: Uses full URL directly (for external services, port-forwarded endpoints)
+   ```yaml  
+   graphqlEndpoint: "http://192.168.1.46:3085/graphql"  # Full URL
+   ```
 
 ## Monitoring and Observability
 
@@ -210,13 +267,16 @@ curl http://localhost:8080/metrics
 ### Common Issues
 
 1. **No pods found for TargetApp**
-   - Verify label selectors match your application pods
+   - Verify label selectors match your application pods  
    - Check that pods are running in the specified namespace
+   - For direct URL mode, selector can be a dummy value
 
 2. **GraphQL endpoint unreachable**
    - Ensure your application exposes the GraphQL endpoint
    - Check network policies and firewall rules
    - Verify the endpoint path is correct
+   - For port-forwarded endpoints, use `--address 0.0.0.0` to bind to all interfaces
+   - Test connectivity: `curl -X POST $ENDPOINT -H "Content-Type: application/json" -d '{"query": "{ __schema { queryType { name } } }"}'`
 
 3. **Actions not executing**
    - Check operator logs for action execution errors
@@ -240,10 +300,27 @@ kubectl get targetapps -o yaml
 # View generated events
 kubectl get events --field-selector involvedObject.kind=TargetApp
 
-# Check operator metrics
-kubectl port-forward svc/kco-operator 8080:8080 -n kco-system
-curl http://localhost:8080/metrics
+# Test GraphQL connectivity from within cluster
+kubectl run debug --image=curlimages/curl -it --rm -- /bin/sh
+# Then run: curl -X POST http://your-endpoint/graphql -H "Content-Type: application/json" -d '{"query": "{ syncStatus }"}'
+
+# Check operator health and metrics
+kubectl port-forward svc/kco-operator 8080:8080 8081:8081 -n kco-system
+curl http://localhost:8081/healthz  # Health check
+curl http://localhost:8081/stats    # Monitoring statistics
+curl http://localhost:8080/metrics  # Prometheus metrics
 ```
+
+## Testing
+
+The project includes comprehensive testing capabilities:
+
+- **Unit Tests**: `poetry run pytest`
+- **Integration Tests**: Real Kubernetes cluster testing with KinD
+- **E2E Tests**: Production GraphQL endpoint monitoring
+- **Container Testing**: Podman-based image builds and deployment
+
+For detailed testing instructions, see [TESTING.md](TESTING.md).
 
 ## Contributing
 
@@ -252,9 +329,10 @@ curl http://localhost:8080/metrics
 3. Make your changes and add tests
 4. Run tests: `poetry run pytest`
 5. Run linting: `poetry run ruff check && poetry run black --check .`
-6. Commit your changes: `git commit -m 'Add amazing feature'`
-7. Push to the branch: `git push origin feature/amazing-feature`
-8. Open a Pull Request
+6. Test with KinD: Follow [TESTING.md](TESTING.md) for local deployment testing
+7. Commit your changes: `git commit -m 'Add amazing feature'`
+8. Push to the branch: `git push origin feature/amazing-feature`
+9. Open a Pull Request
 
 ## License
 

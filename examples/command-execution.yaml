@@ -1,0 +1,116 @@
+apiVersion: operator.kco.local/v1alpha1
+kind: TargetApp
+metadata:
+  name: maintenance-automation
+  namespace: production
+spec:
+  selector:
+    matchLabels:
+      app: data-processor
+  
+  graphqlEndpoint: "/admin/graphql"
+  pollingInterval: 120  # Check every 2 minutes
+  
+  stateQuery: |
+    query ProcessorStatus {
+      processor {
+        status
+        queueSize
+        lastProcessed
+        errors {
+          deadLetters
+          processing
+        }
+        resources {
+          diskUsage
+          memoryUsage
+        }
+        health {
+          overall
+          database
+          fileSystem
+        }
+      }
+    }
+  
+  actions:
+    # Clear dead letter queue when it gets too large
+    - trigger:
+        field: "processor.errors.deadLetters"
+        condition: "greater_than"
+        value: 1000
+      action: "exec_command"
+      parameters:
+        command: ["/scripts/clear-dead-letters.sh", "--threshold", "1000"]
+        timeout: 300
+        container: "processor"
+    
+    # Restart processor when queue is stuck
+    - trigger:
+        field: "processor.queueSize"
+        condition: "greater_than"
+        value: 10000
+      action: "exec_command"
+      parameters:
+        command: "/bin/sh"
+        args: ["-c", "kill -TERM $(pgrep -f 'queue-processor') && sleep 5 && /app/start-processor.sh"]
+        timeout: 60
+    
+    # Run disk cleanup when usage is high
+    - trigger:
+        field: "processor.resources.diskUsage"
+        condition: "greater_than"
+        value: 0.85
+      action: "exec_command"
+      parameters:
+        command: ["python", "/scripts/cleanup.py", "--aggressive", "--free-target", "20%"]
+        timeout: 600
+        workingDir: "/app"
+    
+    # Health check and auto-healing
+    - trigger:
+        field: "processor.health.database"
+        condition: "equals"
+        value: "unhealthy"
+      action: "exec_command"
+      parameters:
+        command: ["/scripts/heal-database-connection.sh"]
+        timeout: 120
+    
+    # Generate diagnostic report on critical errors
+    - trigger:
+        field: "processor.errors.processing"
+        condition: "greater_than"
+        value: 50
+      action: "exec_command"
+      parameters:
+        command: |
+          #!/bin/bash
+          echo "Generating diagnostic report for high error rate..."
+          /app/tools/diagnostics.sh --output /tmp/diagnostics-$(date +%s).log
+          /app/tools/upload-logs.sh /tmp/diagnostics-*.log
+          echo "Diagnostic report uploaded"
+        timeout: 300
+        container: "processor"
+    
+    # Graceful restart with state preservation
+    - trigger:
+        field: "processor.resources.memoryUsage"
+        condition: "greater_than"
+        value: 0.9
+      action: "exec_command"
+      parameters:
+        command: |
+          #!/bin/bash
+          echo "High memory usage detected, performing graceful restart..."
+          # Save current state
+          /app/save-state.sh /tmp/processor-state.json
+          # Signal graceful shutdown
+          kill -USR1 $(pgrep -f 'main-processor')
+          # Wait for shutdown
+          sleep 30
+          # Force kill if still running
+          pkill -f 'main-processor'
+          # Restart with saved state
+          /app/start-processor.sh --restore /tmp/processor-state.json
+        timeout: 180

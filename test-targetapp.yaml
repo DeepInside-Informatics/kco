@@ -1,0 +1,40 @@
+apiVersion: operator.kco.local/v1alpha1
+kind: TargetApp
+metadata:
+  name: production-tapp-test
+  namespace: default
+spec:
+  # This selector should match your production TApp pods
+  # Since we're using port-forwarded endpoint, we'll use a dummy selector
+  selector:
+    matchLabels:
+      app: production-tapp
+  
+  # GraphQL endpoint - for testing with port-forwarded endpoint
+  # The operator pod needs to be able to reach the host machine
+  # Using host's actual IP address from the same network
+  graphqlEndpoint: "http://192.168.1.46:3085/graphql"
+  
+  # Poll every 15 seconds for testing
+  pollingInterval: 15
+  
+  # Monitor the syncStatus field
+  stateQuery: |
+    query MonitorSync {
+      syncStatus
+    }
+  
+  # Actions to trigger based on state changes
+  # Note: Using restart_pod action for testing since webhook parameters 
+  # need additionalProperties: true in CRD schema
+  actions:
+  - trigger:
+      field: "syncStatus"
+      condition: "not_equals"
+      value: "SYNCED"
+    action: "restart_pod"
+    parameters: {}
+  
+  # Configuration
+  timeout: 10
+  maxRetries: 3

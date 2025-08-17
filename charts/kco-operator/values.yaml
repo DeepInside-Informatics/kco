@@ -1,0 +1,178 @@
+# Default values for kco-operator
+# This is a YAML-formatted file.
+
+# Global configuration
+global:
+  imagePullSecrets: []
+
+# Operator image configuration
+image:
+  repository: kco-operator
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+# Deployment configuration
+replicaCount: 1
+
+# Service Account
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+# Pod Security Context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+# Container Security Context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Resource limits and requests
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod labels
+podLabels: {}
+
+# Operator configuration
+config:
+  # Logging configuration
+  logLevel: "INFO"
+  logFormat: "json"
+  
+  # GraphQL configuration
+  graphqlTimeout: 10
+  graphqlMaxRetries: 3
+  
+  # Polling configuration
+  defaultPollingInterval: 30
+  
+  # Action execution configuration
+  actionExecutionTimeout: 300
+  
+  # Metrics configuration
+  metricsEnabled: true
+  metricsPort: 8080
+  
+  # Health check configuration
+  healthPort: 8081
+  
+  # Rate limiting
+  rateLimitRequests: 100
+
+# Service configuration for metrics
+service:
+  type: ClusterIP
+  metricsPort: 8080
+  healthPort: 8081
+
+# ServiceMonitor for Prometheus integration
+serviceMonitor:
+  enabled: false
+  namespace: ""
+  labels: {}
+  annotations: {}
+  interval: 30s
+  scrapeTimeout: 10s
+  path: /metrics
+
+# RBAC configuration
+rbac:
+  create: true
+  rules:
+    # Core API permissions
+    - apiGroups: [""]
+      resources: ["pods", "pods/status"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: [""]
+      resources: ["events"]
+      verbs: ["create", "patch"]
+    - apiGroups: [""]
+      resources: ["pods/exec"]
+      verbs: ["create"]
+    # Apps API permissions
+    - apiGroups: ["apps"]
+      resources: ["deployments", "deployments/scale", "replicasets", "daemonsets", "statefulsets"]
+      verbs: ["get", "list", "watch", "update", "patch"]
+    # Custom resource permissions
+    - apiGroups: ["operator.kco.local"]
+      resources: ["targetapps", "targetapps/status"]
+      verbs: ["get", "list", "watch", "update", "patch"]
+
+# Custom Resource Definition
+crd:
+  install: true
+  annotations: {}
+
+# Namespace configuration
+namespaceOverride: ""
+
+# Environment variables
+env: []
+# - name: KCO_LOG_LEVEL
+#   value: "DEBUG"
+
+# Extra volumes and volume mounts
+extraVolumes: []
+extraVolumeMounts: []
+
+# Init containers
+initContainers: []
+
+# Sidecar containers  
+sidecars: []
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  # maxUnavailable: 1
+
+# Network policy
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow HTTPS to external services (for webhooks)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80

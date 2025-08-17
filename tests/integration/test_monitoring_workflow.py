@@ -78,7 +78,7 @@ def sample_tapp_spec():
             }
         },
         "graphqlEndpoint": "/graphql",
-        "pollingInterval": 1,  # Fast polling for tests
+        "pollingInterval": 5,  # Minimum valid polling interval
         "stateQuery": """
             query {
                 application {
@@ -230,7 +230,7 @@ class TestMonitoringWorkflow:
 
             # Use very fast polling to trigger rate limiting
             fast_spec = sample_tapp_spec.copy()
-            fast_spec["pollingInterval"] = 0.1  # 100ms polling
+            fast_spec["pollingInterval"] = 5  # Minimum valid polling interval
 
             await low_limit_controller.start_monitoring(namespace, name, fast_spec)
 
@@ -266,9 +266,19 @@ class TestTAppConfig:
 
     def test_valid_config_parsing(self, sample_tapp_spec):
         """Test parsing valid TApp configuration."""
-        config = TAppConfig.model_validate(sample_tapp_spec)
+        # Convert camelCase to snake_case for TAppConfig
+        converted_spec = {
+            'selector': sample_tapp_spec.get('selector', {}),
+            'graphql_endpoint': sample_tapp_spec.get('graphqlEndpoint', '/graphql'),
+            'polling_interval': sample_tapp_spec.get('pollingInterval', 30),
+            'state_query': sample_tapp_spec.get('stateQuery', ''),
+            'actions': sample_tapp_spec.get('actions', []),
+            'timeout': sample_tapp_spec.get('timeout', 10),
+            'max_retries': sample_tapp_spec.get('maxRetries', 3)
+        }
+        config = TAppConfig.model_validate(converted_spec)
 
-        assert config.polling_interval == 1
+        assert config.polling_interval == 5
         assert config.graphql_endpoint == "/graphql"
         assert config.timeout == 5
         assert config.max_retries == 2

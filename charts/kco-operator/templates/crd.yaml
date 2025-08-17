@@ -78,8 +78,8 @@ spec:
                       enum: ["restart_pod", "scale_deployment", "patch_resource", "webhook", "exec_command"]
                       description: "Action to execute"
                     parameters:
-                      type: object
                       description: "Action-specific parameters"
+                      x-kubernetes-preserve-unknown-fields: true
               timeout:
                 type: integer
                 default: 10

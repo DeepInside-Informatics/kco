@@ -1,0 +1,39 @@
+apiVersion: operator.kco.local/v1alpha1
+kind: TargetApp
+metadata:
+  name: production-tapp-slack-test
+  namespace: default
+spec:
+  # Dummy selector since we're using direct URL
+  selector:
+    matchLabels:
+      app: production-tapp
+  
+  # GraphQL endpoint - production TApp with port-forwarding
+  graphqlEndpoint: "http://192.168.1.46:3085/graphql"
+  
+  # Poll every 30 seconds for testing
+  pollingInterval: 30
+  
+  # Monitor the syncStatus field
+  stateQuery: |
+    query MonitorSync {
+      syncStatus
+    }
+  
+  # Slack webhook action - triggers when syncStatus equals "SYNCED" for immediate testing
+  actions:
+  - trigger:
+      field: "syncStatus"
+      condition: "equals"
+      value: "SYNCED"
+    action: "webhook"
+    parameters:
+      url: "https://hooks.slack.com/services/SOMEUUIDFORTHEBOT/OTHERSLACKCHANNEL/SOMEUNIQUEID"
+      method: "POST"
+      payload:
+        text: "🚨 KCO Operator Alert: TargetApp {{tapp_name}} in namespace {{namespace}} has syncStatus={{syncStatus}} at {{timestamp}}"
+  
+  # Configuration
+  timeout: 10
+  maxRetries: 3

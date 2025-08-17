@@ -73,6 +73,7 @@ spec:
                     parameters:
                       type: object
                       description: "Action-specific parameters"
+                      additionalProperties: true
               timeout:
                 type: integer
                 default: 10

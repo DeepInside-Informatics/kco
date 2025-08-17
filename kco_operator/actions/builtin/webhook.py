@@ -188,6 +188,11 @@ class WebhookAction(ActionHandler):
         payload_str = payload_str.replace("{{namespace}}", context.state_change.namespace)
         payload_str = payload_str.replace("{{timestamp}}", payload["timestamp"])
         
+        # Support accessing state data
+        new_state = context.state_change.new_snapshot.data
+        if "syncStatus" in new_state:
+            payload_str = payload_str.replace("{{syncStatus}}", str(new_state["syncStatus"]))
+        
         return json.loads(payload_str)
     
     async def close(self) -> None:
